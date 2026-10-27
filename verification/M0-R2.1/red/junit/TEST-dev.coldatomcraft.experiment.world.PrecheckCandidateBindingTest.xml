@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="dev.coldatomcraft.experiment.world.PrecheckCandidateBindingTest" tests="4" skipped="0" failures="4" errors="0" timestamp="2026-10-26T07:17:04.165Z" hostname="DESKTOP-A4M7O81" time="0.006">
+  <properties/>
+  <testcase name="changedEnergyCannotReusePrecheckForSameEventKey()" classname="dev.coldatomcraft.experiment.world.PrecheckCandidateBindingTest" time="0.001">
+    <failure message="org.opentest4j.AssertionFailedError: expected: not equal but was: &lt;CLAIMED&gt;" type="org.opentest4j.AssertionFailedError">org.opentest4j.AssertionFailedError: expected: not equal but was: &lt;CLAIMED&gt;
+	at app//org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:152)
+	at app//org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at app//org.junit.jupiter.api.AssertNotEquals.failEqual(AssertNotEquals.java:277)
+	at app//org.junit.jupiter.api.AssertNotEquals.assertNotEquals(AssertNotEquals.java:263)
+	at app//org.junit.jupiter.api.AssertNotEquals.assertNotEquals(AssertNotEquals.java:258)
+	at app//org.junit.jupiter.api.Assertions.assertNotEquals(Assertions.java:2819)
+	at app//dev.coldatomcraft.experiment.world.PrecheckCandidateBindingTest.changedEnergyCannotReusePrecheckForSameEventKey(PrecheckCandidateBindingTest.java:24)
+	at java.base@25.0.3/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base@25.0.3/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base@25.0.3/java.util.ArrayList.forEach(ArrayList.java:1604)
+</failure>
+  </testcase>
+  <testcase name="changedReadSetCannotReusePrecheckForSameEventKey()" classname="dev.coldatomcraft.experiment.world.PrecheckCandidateBindingTest" time="0.001">
+    <failure message="org.opentest4j.AssertionFailedError: expected: not equal but was: &lt;CLAIMED&gt;" type="org.opentest4j.AssertionFailedError">org.opentest4j.AssertionFailedError: expected: not equal but was: &lt;CLAIMED&gt;
+	at app//org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:152)
+	at app//org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at app//org.junit.jupiter.api.AssertNotEquals.failEqual(AssertNotEquals.java:277)
+	at app//org.junit.jupiter.api.AssertNotEquals.assertNotEquals(AssertNotEquals.java:263)
+	at app//org.junit.jupiter.api.AssertNotEquals.assertNotEquals(AssertNotEquals.java:258)
+	at app//org.junit.jupiter.api.Assertions.assertNotEquals(Assertions.java:2819)
+	at app//dev.coldatomcraft.experiment.world.PrecheckCandidateBindingTest.changedReadSetCannotReusePrecheckForSameEventKey(PrecheckCandidateBindingTest.java:72)
+	at java.base@25.0.3/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base@25.0.3/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base@25.0.3/java.util.ArrayList.forEach(ArrayList.java:1604)
+</failure>
+  </testcase>
+  <testcase name="movedTargetCannotReusePrecheckForSameEventKey()" classname="dev.coldatomcraft.experiment.world.PrecheckCandidateBindingTest" time="0.002">
+    <failure message="org.opentest4j.AssertionFailedError: expected: not equal but was: &lt;CLAIMED&gt;" type="org.opentest4j.AssertionFailedError">org.opentest4j.AssertionFailedError: expected: not equal but was: &lt;CLAIMED&gt;
+	at app//org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:152)
+	at app//org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at app//org.junit.jupiter.api.AssertNotEquals.failEqual(AssertNotEquals.java:277)
+	at app//org.junit.jupiter.api.AssertNotEquals.assertNotEquals(AssertNotEquals.java:263)
+	at app//org.junit.jupiter.api.AssertNotEquals.assertNotEquals(AssertNotEquals.java:258)
+	at app//org.junit.jupiter.api.Assertions.assertNotEquals(Assertions.java:2819)
+	at app//dev.coldatomcraft.experiment.world.PrecheckCandidateBindingTest.movedTargetCannotReusePrecheckForSameEventKey(PrecheckCandidateBindingTest.java:40)
+	at java.base@25.0.3/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base@25.0.3/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base@25.0.3/java.util.ArrayList.forEach(ArrayList.java:1604)
+</failure>
+  </testcase>
+  <testcase name="changedDeviceRevisionCannotReusePrecheckForSameEventKey()" classname="dev.coldatomcraft.experiment.world.PrecheckCandidateBindingTest" time="0.002">
+    <failure message="org.opentest4j.AssertionFailedError: expected: not equal but was: &lt;CLAIMED&gt;" type="org.opentest4j.AssertionFailedError">org.opentest4j.AssertionFailedError: expected: not equal but was: &lt;CLAIMED&gt;
+	at app//org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:152)
+	at app//org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at app//org.junit.jupiter.api.AssertNotEquals.failEqual(AssertNotEquals.java:277)
+	at app//org.junit.jupiter.api.AssertNotEquals.assertNotEquals(AssertNotEquals.java:263)
+	at app//org.junit.jupiter.api.AssertNotEquals.assertNotEquals(AssertNotEquals.java:258)
+	at app//org.junit.jupiter.api.Assertions.assertNotEquals(Assertions.java:2819)
+	at app//dev.coldatomcraft.experiment.world.PrecheckCandidateBindingTest.changedDeviceRevisionCannotReusePrecheckForSameEventKey(PrecheckCandidateBindingTest.java:56)
+	at java.base@25.0.3/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base@25.0.3/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base@25.0.3/java.util.ArrayList.forEach(ArrayList.java:1604)
+</failure>
+  </testcase>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

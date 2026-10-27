@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "deviceId": "coldatomcraft:laser_source",
+  "status": "asset_spec_only_not_a_model",
+  "source": "laser_source.blend",
+  "interchange": "laser_source.glb",
+  "blenderUnitMeters": 1.0,
+  "axes": {"up": "+Z", "forward": "-Y"},
+  "interchangeAxes": {"up": "+Y", "forward": "+Z"},
+  "pivot": "base_footprint_center",
+  "anchors": [
+    {"name": "PORT_LASER_OUT_0", "role": "optical_output", "forward": "-Y"},
+    {"name": "CTRL_POWER", "role": "interactive_control"},
+    {"name": "CTRL_SHUTTER", "role": "interactive_control"},
+    {"name": "SCREEN_STATUS", "role": "display"}
+  ],
+  "notes": "The game calculates emission from the transformed output anchor. Nothing here defines the laser propagation equations."
+}

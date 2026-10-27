@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="dev.coldatomcraft.experiment.world.WorldReadSetTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-26T06:46:49.194Z" hostname="DESKTOP-A4M7O81" time="0.004">
+  <properties/>
+  <testcase name="revisionIdentityIncludesLoadEpochContentAndLoadedState()" classname="dev.coldatomcraft.experiment.world.WorldReadSetTest" time="0.0"/>
+  <testcase name="rejectsDuplicateMixedDimensionAndUnloadedChunks()" classname="dev.coldatomcraft.experiment.world.WorldReadSetTest" time="0.001"/>
+  <testcase name="canonicalizesOrderAndSupportsChunkLookup()" classname="dev.coldatomcraft.experiment.world.WorldReadSetTest" time="0.001"/>
+  <testcase name="simulationIntervalIsHalfOpenAndDetectsOverlap()" classname="dev.coldatomcraft.experiment.world.WorldReadSetTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

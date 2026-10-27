@@ -1,0 +1,31 @@
+{
+  "source_root": "/mnt/data/cac_d4_work/ColdAtomCraft-M0-R2.1-D4",
+  "timestamp_utc": "20261026T154612Z",
+  "os": "Linux-6.18.55-x86_64-with-glibc2.41",
+  "scope": "M0-D4 source build/JUnit/JAR content only; NOT game startup or Owner signoff",
+  "checks": {
+    "java-version": {
+      "status": "PASS",
+      "exit_code": 0,
+      "log": "java-version.log",
+      "seconds": 0.033
+    },
+    "javac-version": {
+      "status": "PASS",
+      "exit_code": 0,
+      "log": "javac-version.log",
+      "seconds": 0.126
+    },
+    "jdk25-toolchain": {
+      "status": "BLOCKED",
+      "reason": "both java and javac must be Java 25",
+      "java": "openjdk version \"21.0.12.1\" 2026-08-18\nOpenJDK Runtime Environment (build 21.0.12.1+1-1-deb13u1-Debian)\nOpenJDK 64-Bit Server VM (build 21.0.12.1+1-1-deb13u1-Debian, mixed mode, sharing)",
+      "javac": "javac 21.0.12.1"
+    }
+  },
+  "actual_installed_jar_runtime": "NOT RUN",
+  "minecraft_client_runtime": "NOT RUN",
+  "minecraft_dedicated_server_runtime": "NOT RUN",
+  "actual_blender_export": "NOT RUN",
+  "status": "BLOCKED"
+}

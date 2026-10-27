@@ -1,0 +1,34 @@
+{
+  "status": "FAIL",
+  "sha256": "cc681d831bc6038882384874e9ee2db735787835517719bb2b8cd30ccbd18d92",
+  "class_count": 37,
+  "module_class_counts": {
+    "physics-core": 0,
+    "experiment-core": 0,
+    "neoforge-mod": 0
+  },
+  "findings": [
+    "missing required entry: dev/coldatomcraft/experiment/world/ExperimentRunScheduler.class",
+    "missing required entry: dev/coldatomcraft/experiment/world/ExperimentReservation.class",
+    "missing required entry: dev/coldatomcraft/experiment/PreviewOpticalBench.class",
+    "missing required entry: dev/coldatomcraft/experiment/PreviewBeamRoute.class",
+    "missing required entry: dev/coldatomcraft/neoforge/preview/PreviewBlocks.class",
+    "missing required entry: dev/coldatomcraft/neoforge/preview/DiagnosticLaserBlock.class",
+    "missing required entry: dev/coldatomcraft/neoforge/preview/DiagnosticPowerMeterBlock.class",
+    "missing required entry: dev/coldatomcraft/neoforge/preview/DiagnosticBeamScan.class",
+    "missing required entry: assets/coldatomcraft/blockstates/diagnostic_laser.json",
+    "missing required entry: assets/coldatomcraft/blockstates/diagnostic_power_meter.json",
+    "missing required entry: assets/coldatomcraft/models/block/diagnostic_laser_off.json",
+    "missing required entry: assets/coldatomcraft/models/block/diagnostic_laser_on.json",
+    "missing required entry: assets/coldatomcraft/models/block/diagnostic_power_meter_0.json",
+    "missing required entry: assets/coldatomcraft/models/block/diagnostic_power_meter_1.json",
+    "missing required entry: assets/coldatomcraft/models/block/diagnostic_power_meter_2.json",
+    "missing required entry: assets/coldatomcraft/items/diagnostic_laser.json",
+    "missing required entry: assets/coldatomcraft/items/diagnostic_power_meter.json",
+    "missing required entry: assets/coldatomcraft/lang/en_us.json",
+    "missing required entry: assets/coldatomcraft/lang/zh_cn.json",
+    "missing required entry: data/coldatomcraft/loot_table/blocks/diagnostic_laser.json",
+    "missing required entry: data/coldatomcraft/loot_table/blocks/diagnostic_power_meter.json",
+    "mod ID/version do not match gradle.properties"
+  ]
+}

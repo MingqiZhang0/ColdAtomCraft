@@ -1,0 +1,24 @@
+.gradle/
+build/
+**/build/
+run/
+run-data/
+.idea/
+*.iml
+.vscode/
+.DS_Store
+*.log
+# Keep the M0-R2 runtime evidence deliberately.
+!verification/M0-R2/logs/*.log
+*.class
+out/
+**/.cache/
+
+# Python helper caches
+__pycache__/
+*.pyc
+
+# D4 local evidence: curate the included audit logs, but never commit personal
+# runtime captures or independently created Minecraft worlds.
+!verification/M0-R2.1-D4/logs/*.log
+verification/local-jdk25/

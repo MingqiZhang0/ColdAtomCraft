@@ -1,0 +1,1438 @@
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -40,6 +40,7 @@
+           python verification/M0-R2.1-D5/verify_optics_reference.py
+           python verification/M0-R2.1-D6/verify_coherent_reference.py
+           python verification/M0-R2.1-D7/verify_optical_path_reference.py
++          python verification/M0-R2.1-D8/verify_fresnel_reference.py
+           python -m unittest discover -s verification -p 'test_*.py' -v
+           python tools/validate_assets.py assets/manifests/laser_source.example.json
+ 
+@@ -89,7 +90,7 @@
+         if: always()
+         uses: actions/upload-artifact@v4
+         with:
+-          name: CAC-M0-R2.1-D7-junit-reports
++          name: CAC-M0-R2.1-D8-junit-reports
+           path: |
+             physics-core/build/test-results/test/*.xml
+             experiment-core/build/test-results/test/*.xml
+@@ -99,6 +100,6 @@
+       - name: Upload NeoForge JAR
+         uses: actions/upload-artifact@v4
+         with:
+-          name: CAC-M0-R2.1-D7-neoforge
++          name: CAC-M0-R2.1-D8-neoforge
+           path: neoforge-mod/build/libs/*.jar
+           retention-days: 14
+--- a/README.md
++++ b/README.md
+@@ -1,3 +1,45 @@
++# CAC M0-R2.1-D8 — 3D experimental reflection/Fresnel scientific reference (2026-10-26)
++
++**D8 is an offline Physics Core draft, NOT a playable NeoForge mod or an
++Owner-approved calibrated optical model. M0 remains OPEN.**
++
++Building on frozen D7 (287/287 manifest entries verified), this checkpoint
++implements local 3D optical ray frames, right-handed s/p polarization bases,
++front-face planar intersection, single-interface dielectric Fresnel r/t
++with **power-normalized** transmission, total internal reflection phases,
++and a separate calibrated **lossless planar mirror**. No coating properties,
++finite-beam boundary integrals or material heating are fabricated.
++
++At a flat mirror `q_out=q_in` in the outgoing forward coordinate: the
++transverse Gaussian wavefront is not conjugated. This is checked at several
++nonzero radial offsets. D8 does NOT replace D7's coherent path/q solver:
++using a D7 reference-plane adapter requires explicit local optical frames,
++and a ray phase must not be counted twice alongside D7 freeSpace/Gouy.
++
++**Current-host evidence:** 383/383 engineering smoke, 255/255 Java test-source
++methods with an offline **NON-JUNIT** shim, 18/18 D8 ray smoke,
++146/146 Decimal80 Fresnel reference comparisons, and historical D5/D6/D7
++oracles 36+39+29. JDK25 Gradle/JUnit **BLOCKED**, D8 NeoForge build/runtime
++**NOT RUN** on this JDK21 host. No ModelCatalog production OWNER_APPROVED entry.
++
++D8 offline verification:
++
++```bash
++sh verification/M0-R2.1-D8/run_d8_offline.sh
++```
++
++Formal JDK25 Gradle/JUnit/JAR verification on an appropriately configured host:
++
++```bash
++python tools/verify_m0.py
++```
++
++Read [D8 optical science and conventions](docs/OPT_001_GEOMETRIC_FRESNEL_REFERENCE.md),
++[D8 verification evidence](verification/M0-R2.1-D8/README.md) and
++[D8 audit](docs/M0_R2_1_D8_AUDIT.md).
++
++---
++
+ # CAC-M0-R2.1-D7 — phase-tracked experimental optical-path reference (2026-10-26)
+ 
+ **D7 is a scientific numerical DRAFT, not an Owner-approved production model,
+--- a/docs/ARCHITECTURE.md
++++ b/docs/ARCHITECTURE.md
+@@ -1,3 +1,16 @@
++## D8 geometric optical interfaces (draft, no NeoForge adapter)
++
++`physics-core` now has a *separate* finite ray/port reference in
++`RayFrame3` / `GeometricJonesRay`. `OpticalPlane3` computes an oriented,
++front-face-only intersection. `PlanarFresnelInterface` preserves both
++reflected and transmitted energy-accounted ports, including complex TIR
++reflection phases; `IdealCalibratedPlaneMirror` is a distinct lossless
++mirror with externally supplied s/p phases. These are independent of
++`experiment-core` and do NOT mutate the Minecraft world. Only an explicit
++adapter at a calibrated D7 reference plane can pass mode amplitudes to the
++ray model; full Gaussian finite-beam refraction is NOT implemented. Details:
++`docs/OPT_001_GEOMETRIC_FRESNEL_REFERENCE.md`.
++
+ ## D7 optics reference sublayer (2026-10-26)
+ 
+ `physics-core/optics` now has a phase-aware `ParaxialModeField`, immutable
+--- a/docs/CHANGELOG.md
++++ b/docs/CHANGELOG.md
+@@ -1,3 +1,19 @@
++## CAC-M0-R2.1-D8 · 2026-10-26 · Geometric optical interface and mirror reference
++
++- Added right-handed `RayFrame3`, `GeometricJonesRay`, `LaboratoryJonesAmplitude`,
++  `OpticalPlane3`, `PlanarFresnelInterface`, `IdealCalibratedPlaneMirror`.
++- Implemented 3D specular reflection, Snell refraction, s/p polarization
++  decomposition, signed Fresnel complex field amplitudes, power-normalized
++  transmitted traveling modes and TIR phase-only reflected power.
++- Explicitly **separated** one uncoated lossless dielectric interface from
++  an ideal fully reflective mirror with externally supplied coating phases.
++- Prevented incorrect plane-mirror Gaussian phase conjugation: outgoing-local
++  `q` is unchanged at a flat mirror; radial phase continuity is tested.
++- Added 31 JUnit5-source test methods, 18 standalone geometry smoke checks,
++  146 independent Decimal80 Fresnel scalar comparisons and D8 scripts/docs.
++- Formal JDK25/Gradle/JUnit, NeoForge build/runtime, Blender device integration
++  and Owner production-model approval remain BLOCKED/NOT RUN/NOT IMPLEMENTED.
++
+ ## 2026-10-26 — CAC-M0-R2.1-D7 (experimental optical path)
+ 
+ - Add `ParaxialModeField` with phase-aware vacuum Gaussian propagation,
+--- a/docs/DECISIONS.md
++++ b/docs/DECISIONS.md
+@@ -1,3 +1,17 @@
++## CAC D8 optical-science engineering decision (2026-10-26)
++
++- An uncoated dielectric Fresnel boundary and a real coated laboratory mirror
++  are **not equivalent**; model them as separate, explicitly scoped components.
++- Fresnel electric transmission coefficients require a sqrt(power flux ratio)
++  when applied to D7 `sqrt(W)` traveling-mode amplitudes.
++- The reflected p basis is `k_reflected cross s`, not an unspecified global
++  Cartesian axis. Reflectance signs depend on this basis gauge.
++- At an ordinary flat mirror `q_out=q_in` using the outgoing forward axis;
++  do not silently implement a phase-conjugating mirror.
++- Any geometric-to-modal projection is a central-ray paraxial approximation,
++  not a measured mode overlap or proof of experimental optical alignment.
++- No material absorption, damage, MC-world modification or Owner model approval.
++
+ ## CAC-D7: matched-mode interferometer reference (2026-10-26)
+ 
+ **Engineering-only draft reference:** introduce carrier- and Gouy-phase-tracked
+--- a/docs/M0_R2_1_D8_AUDIT.md
++++ b/docs/M0_R2_1_D8_AUDIT.md
+@@ -0,0 +1,88 @@
++# CAC-M0-R2.1-D8 director scientific and engineering audit
++
++**Review date:** 2026-10-26  
++**Input:** frozen D7 ZIP SHA-256 `1a44ccde9e59ce6fbaa6ec9fe812b0a85d76778cc405ebf1c27114f503183c09`.
++**Input integrity:** original 287/287 SHA-256 entries verified.  
++**Status:** D8 independent optical science reference checkpoint; **NOT**
++Minecraft/NeoForge release, M0 CLOSED or Owner-approved production model.
++
++## Engineering result
++
++The D8 optics classes are deliberately separate from world state, damage,
++heating, Material registry and NeoForge classes. The `physics-core` retains
++Java21 compatibility for the offline reference, while the project itself
++requires JDK25 for its actual Gradle/NeoForge build.
++
++### Major scientific findings
++
++1. Three-dimensional specular reflection and Snell refraction are performed
++   from a local oriented surface normal, not Blender/world cardinal axes.
++2. s/p polarization bases are right-handed and explicitly tied to each ray;
++   Fresnel reflection p scalar signs are gauge dependent. E field continuity
++   is verified in Cartesian lab coordinates.
++3. Fresnel *electric field* transmission coefficients must be multiplied by
++   sqrt(n2*cos(theta_t)/(n1*cos(theta_i))) when used with D7 `sqrt(W)`
++   modal amplitudes. Without that flux factor energy accounting is wrong.
++4. Total internal reflection produces complex unit-magnitude reflected
++   coefficients and zero **outgoing traveling-power ray**. An evanescent
++   transmitted field exists physically but is NOT represented in D8.
++5. A normal flat mirror preserves the local Gaussian q at the reflection
++   plane when its new forward propagation direction is used, i.e.
++   `q_out=q_in`. Using `-conj(q_in)` would silently produce an unphysical
++   phase-conjugated wavefront. Multiple off-axis radial checks verify that
++   the mirror's transverse field differs only by its explicit Jones phase.
++6. A fully reflecting coated mirror is not one Fresnel dielectric interface;
++   D8 uses a distinct ideal phase-defined mirror with explicitly supplied
++   s/p phases and no claims about real-coating data.
++7. Geometric propagation detects a positive displacement that would round
++   to zero at very large double world coordinates. This is not a general
++   cure for large-distance interferometric phase precision; local lab
++   coordinates and calibrated phases remain required.
++
++### Executed evidence
++
++| Verification | Status | Evidence |
++| --- | --- | --- |
++| D7 ZIP CRC and source SHA | PASS (287/287) | extraction verification |
++| Engineering Java smoke | PASS (383/383) | `verification/M0-R2.1-D8/offline-test-sweep.log` |
++| Java test-source method sweep | PASS (255/255) NON-JUNIT | same log |
++| D8 standalone ray/Fresnel smoke | PASS (18/18) | `d8-science-full.log` |
++| Independent D8 Decimal80 Fresnel cases | PASS (146/146) | `verify_fresnel_reference.py` / `d8-science-full.log` |
++| Retained D5/D6/D7 independent comparisons | PASS (36+39+29) | `d8-science-full.log` |
++| Python asset + verification-tool tests | PASS (30/30) | `offline-test-sweep.log` |
++| Pure Java source strict JDK21 compilation | PASS | `java21-strict.log` |
++| JDK25 preflight | **BLOCKED** (actual JDK21) | `jdk25-preflight/report.json` |
++| Formal Java25 Gradle/JUnit and new JAR | **NOT RUN** | missing JDK25/repositories |
++| D8 NeoForge client/server launch | **NOT RUN** | no D8-built JAR |
++| Blender hardware calibration and real model | **NOT RUN** | no Owner assets |
++| Laser-material heating / MC damage | **NOT IMPLEMENTED** | not authorized |
++
++The offline reflection harness intentionally uses JUnit annotation/Assert
++shims, not a real JUnit Platform. It must NEVER be reported as formal JUnit.
++
++### Open risk boundaries
++
++- A plane-wave central-ray Fresnel approximation is not an exact finite
++  Gaussian angular-spectrum interface. Angular Fresnel variation,
++  apertures, clipping and astigmatism require separate physical models.
++- The `GeometricJonesRay` mode label is a declaration, not a calibrated
++  proof of coherent alignment or server permissions.
++- Arbitrary two-port beam splitters, real coated mirrors and fiber coupling
++  are not modeled by these single-surface equations.
++- No evanescent near fields, real complex metal refractive index, thin-film
++  interference, laser cooling, atomic state dynamics or absorption.
++- The ray-plus-Gaussian adapter must be used ONLY at a known common reference
++  plane. Ray.advance and D7 freeSpace must not both add carrier phase.
++- Geometry does not own a real world server scheduler and does not grant
++  any safety or damage permission. See M0-R2.1-D3/D4 world contracts.
++- Reproducible JDK25 Gradle/JUnit/JAR and separate installed runtime evidence
++  remain hard gates before full M0 close.
++
++### Director decision
++
++**PASS: pure-Java D8 optics scientific reference and documented test checkpoint.**
++**PENDING: formal JDK25/NeoForge build/runtime; Owner production science approval.**
++
++Next useful work: acquire actual mirror/coating optical specifications and
++Blender surface normals, implement an experimental optical power detector,
++and test the end-to-end device in Minecraft only after Java25 Gradle build.
+--- a/docs/M1_SCIENCE_INTAKE.md
++++ b/docs/M1_SCIENCE_INTAKE.md
+@@ -1,3 +1,12 @@
++## D8 physical optics reference, still needing Owner apparatus parameters
++
++D8 adds three-dimensional ray reflection, uncoated single-interface Fresnel
++s/p coefficients, Snell refraction and an ideal phase-defined plane mirror.
++Before claiming this as a real lab mirror, the Owner must provide or approve
++coating/mirror type, wavelength/angular reflectance and phase behavior, port
++coordinate conventions, actual component pose/Blender anchors and reference
++plane, and any finite-beam/aperture assumptions. No values were invented.
++
+ ## D7 scientific intake (NO implied defaults)
+ 
+ D7 now supplies matched-mode two-port interference with explicit phase and
+--- a/docs/OPT_001_GEOMETRIC_FRESNEL_REFERENCE.md
++++ b/docs/OPT_001_GEOMETRIC_FRESNEL_REFERENCE.md
+@@ -0,0 +1,182 @@
++# CAC-OPT-001-D8 — 3D planar reflection, Jones bases and Fresnel reference
++
++**Status:** Independent scientific DRAFT (physics-core), **not** a calibrated
++laboratory mirror, production Owner approval, implemented NeoForge block,
++measurement apparatus, material absorption or Minecraft world modification.
++
++## Scope and relationship to D5–D7
++
++- D5: scalar vacuum TEM00 Gaussian beam, complex q and ABCD.
++- D6: coherent field phasors and Jones polarization.
++- D7: complex modal amplitudes in **sqrt(W)**, q and phase, ideal two-port
++  coupler and coherent matched-mode optical paths.
++- **D8:** a *separate geometric-ray* reference for planar surfaces in 3D,
++  a local s/p basis and analytic Fresnel coefficients. Adds a limited adapter
++  from a D7 Gaussian **reference plane**, but DOES NOT silently equate a ray
++  with a full angular-spectrum treatment of a finite-width Gaussian.
++
++The geometric reference uses laboratory-local metres. A positive ray advance
++that disappears at double precision is rejected rather than silently
++retaining the old position. This is only a partial numerical guard; use a
++local laboratory origin for all interferometric trajectories. No Minecraft global
++coordinates, blocks, chunk revisions, Blender file or actual calibration is
++inferred. The owner supplies true apparatus and coating parameters later.
++
++## 1. Direction and transverse polarization gauge
++
++`RayFrame3` stores a right-handed orthonormal basis (u, v, k), with
++`u cross v = k`, where k is the light propagation direction. The Jones
++amplitude is `a_u * u + a_v * v`, with |a_u|²+|a_v|² measured in watts.
++All three basis vectors are dimensionless; positions are in metres.
++
++An `OpticalPlane3` has unit normal **N pointing from medium 1 to medium 2**.
++The ray MUST enter from medium 1, with `k_i dot N > 1e-12`, and intersect the
++plane in the forward direction. For oblique incidence define
++
++    s = normalize(N cross k_i)
++    p_j = k_j cross s        for j = incident, reflected, transmitted.
++
++The s/p bases are individually right-handed: `s cross p_j = k_j`.
++At exact normal incidence the incidence plane is undefined; the *declared
++incoming transverse u axis* is the s gauge. This avoids silently choosing a
++world-axis polarization and keeps physical Cartesian fields invariant.
++The continuous limit near normal incidence remains a coordinate-gauge issue;
++only the Cartesian field and energy, not individual s/p scalar phases, are
++basis-independent observables.
++
++The reflected direction is
++
++    k_r = k_i - 2 (k_i dot N) N.
++
++For real positive refractive indices n1, n2, Snell's transmitted direction
++when it exists is
++
++    eta = n1/n2
++    cos_i = k_i dot N
++    cos_t = sqrt(1 - eta²(1-cos_i²))
++    k_t = eta (k_i - cos_i N) + cos_t N.
++
++## 2. Single UNCOATED dielectric boundary (NOT a mirror coating)
++
++For an isotropic, non-magnetic, lossless dielectric interface,
++`exp(-i omega t)` and the s/p gauge above, the **electric field** amplitude
++Fresnel coefficients are
++
++    r_s = (n1 cos_i - n2 cos_t)/(n1 cos_i + n2 cos_t)
++    r_p = (n2 cos_i - n1 cos_t)/(n2 cos_i + n1 cos_t)
++    t_s = 2 n1 cos_i/(n1 cos_i + n2 cos_t)
++    t_p = 2 n1 cos_i/(n2 cos_i + n1 cos_t).
++
++The signs of p reflection depend on the REFLECTED transverse p-axis
++convention. Our `p_j = k_j cross s` makes `r_p=-r_s` at normal incidence.
++This is NOT a polarization paradox: since `p_r = -p_i` at normal incidence,
++the actual Cartesian reflected electric fields have the same physical sign.
++The tangential electric fields obey the boundary equation
++`E_i,tangential+E_r,tangential=E_t,tangential` (tested).
++
++**Do not confuse electric amplitudes with power-normalized D7 modes.**
++Fresnel t_s,t_p alone MUST NOT directly multiply D7's sqrt(W) modal amplitudes.
++For n1,n2 real, the modal transmission coefficient additionally carries
++
++    sqrt_flux = sqrt(n2 cos_t/(n1 cos_i))
++    a_t,s/p = (sqrt_flux * t_s/p) * a_i,s/p.
++
++The reflected modal amplitude is `a_r,s/p = r_s/p * a_i,s/p`.
++Thus `R_j=|r_j|²` and `T_j=sqrt_flux²*|t_j|²`, and for each j,
++`R_j+T_j=1`. Both reflected and transmitted ports are preserved.
++**One interface's transmitted mode is not the whole multi-bounce field
++of a finite plate or cavity.** Further internal reflections need explicit
++branch tracing and coherent recombination.
++
++At Brewster incidence from n1 to n2, `tan(theta_B)=n2/n1` and p reflectance
++is zero for ideal lossless dielectrics. This is not a coating property.
++
++### Total internal reflection
++
++When `n1 > n2` and `(n1/n2)^2 sin²(theta_i) >= 1`, D8 returns a complex
++reflection of unit modulus and **no propagating transmitted-power ray**:
++
++    alpha = sqrt((n1/n2)² sin²(theta_i)-1)
++    r_s = (n1 cos_i - i n2 alpha)/(n1 cos_i + i n2 alpha)
++    r_p = (n2 cos_i - i n1 alpha)/(n2 cos_i + i n1 alpha).
++
++This does NOT mean the evanescent electromagnetic field in medium 2 is zero.
++The current ray API does not calculate its penetration depth, near-field
++energy, or frustrated TIR in another nearby interface.
++
++## 3. Ideal calibrated phase-only planar mirror
++
++`IdealCalibratedPlaneMirror` is a separate abstract **100% reflective**
++component; it is intentionally not constructed from a single n1/n2 boundary.
++Its s/p complex reflection coefficients are `exp(i phi_s)` and
++`exp(i phi_p)`, explicitly specified by the caller. The phases are not
++inferred from an unknown real multilayer coating. A later laboratory
++material/optical database must define wavelength, incidence-angle and
++polarization-dependent `r_s,r_p` and any scattering/absorption.
++
++The normal and incident-ray frame select the same output s/p orientation as
++the dielectric interface. A reflected ray's optical power is conserved under
++this idealization; no light-to-heat mapping is allowed.
++
++### Crucial Gaussian q convention at a FLAT mirror
++
++At an ideal planar mirror, with q defined using the **new outgoing forward
++propagation axis** and with the same incident/reference surface plane:
++
++    q_out = q_in     (NOT -conjugate(q_in)).
++
++Why: the transverse complex electric field at the mirror plane must be the
++incident field times the (spatially uniform) calibrated reflection coefficient.
++The Gaussian radial curvature phase is continuous, not complex-conjugated.
++A diverging Gaussian incident on a FLAT mirror remains diverging along the
++new outgoing direction. A phase-conjugating mirror, which returns the beam
++toward its original waist, is a distinct optical device.
++
++`reflectGaussianModeAtPlane()` accepts the D7 mode only if:
++- the modal state and geometric ray are ALREADY at the mirror plane;
++- the phase reference, vacuum wavelength and complete Jones amplitudes match;
++- the caller gives a DISTINCT outgoing mode-frame key.
++
++It does not propagate a Gaussian from the laser to the mirror; do that with
++D7's `freeSpace` (including Gouy phase), then construct the geometric ray
++AT that reference plane. Do not call both geometric ray.advance() and modal
++freeSpace() and combine both carrier phase advances: that double counts phase.
++The monochromatic ray phase advance is only a geometric, local plane-wave
++reference for paths without a q state.
++
++For a narrow paraxial Gaussian, a spatially constant local reflection
++coefficient is a central-ray approximation; finite aperture, angle-varying
++coatings, clipping, astigmatism, distortions and high-NA vector diffraction
++are NOT modeled.
++
++## 4. Executable verification and science gates
++
++- 31 new JUnit5-source tests across 3 new test classes (D7 baseline 224;
++  D8 source methods 255). Executed with an offline reflection shim under
++  Java21, **not** official JUnit Platform.
++- Full engineering smoke: 383/383.
++- D8 `GeometryOpticsSmoke`: 18 checks.
++- Independent stdlib Decimal80 oracle: 146 numerical comparisons across 9
++  Fresnel cases and Brewster reference, including supercritical phase.
++- D5/D6/D7 independent oracles remain: 36+39+29 scalar comparisons.
++- Additional boundary and covariant 3D-Jones tests cover optical power,
++  right-handed bases, tangent E continuity, Snell/specular geometry,
++  Brewster zero and TIR without invented traveling transmission.
++- A reproducible JDK25 preflight reports BLOCKED on this JDK21-only host.
++  A full Gradle/JUnit/NeoForge build and actual game startup MUST be tested
++  on a separate prepared build host; historical R2 logs do not validate D8.
++
++**Scientific limitations:** No complex refractive-index metals, multilayer
++coatings, finite Gaussian angular-spectrum propagation through refracting
++surfaces, astigmatic beams, mode-overlap integrals, optical detector response,
++evanscent near-field numerical grids, laser-material absorption, world blocks,
++entity damage, atomic scattering or Owner-approved production models.
++
++**Authoritative background:**
++- RP Photonics, Fresnel Equations: https://www.rp-photonics.com/fresnel_equations.html
++- COMSOL Wave/Ray Optics Fresnel explanation and reflection p-gauge note:
++  https://doc.comsol.com/6.3/doc/com.comsol.help.roptics/roptics_ug_optics.6.64.html
++- COMSOL Fresnel analytic verification (Brewster and R+T=1):
++  https://doc.comsol.com/6.3/doc/com.comsol.help.models.rf.fresnel_equations/fresnel_equations.html
++- Edmund Optics, Gaussian q and ABCD:
++  https://www.edmundoptics.com/knowledge-center/application-notes/lasers/gaussian-beam-propagation/
+--- a/docs/PHYSICS_MODEL_CONTRACT.md
++++ b/docs/PHYSICS_MODEL_CONTRACT.md
+@@ -1,3 +1,13 @@
++## D8 reference amendment: optical surface geometry (DRAFT ONLY)
++
++The real-optics request authorizes studying standard experimental models,
++not inventing coating/material constants or granting production model approval.
++`PlanarFresnelInterface` assumes two real positive nondispersive dielectric
++indices, a single flat nonmagnetic boundary and a central-plane-wave ray;
++`IdealCalibratedPlaneMirror` assumes exactly lossless reflection with externally
++specified s/p phases. Neither yields absorption, game damage or a proven
++finite Gaussian interface solution. All outputs stay in pure physics-core.
++
+ ## OPT-001-D7 scientific reference (not Owner approval)
+ 
+ A new matched-mode CW TEM00 two-port interferometer reference tracks q,
+--- a/docs/TEST_PLAN.md
++++ b/docs/TEST_PLAN.md
+@@ -1,3 +1,21 @@
++## CAC D8 reference verification (2026-10-26)
++
++- D7 baseline verified 287/287 SHA-256 before modifications.
++- New geometric Fresnel tests: normal incidence (s/p sign and power), Snell,
++  Brewster, total internal reflection complex phases, boundary tangent E,
++  near-critical classification, 3D tilted plane, rotation covariance, finite
++  path phase, two-surface branch bookkeeping, invalid/grazing incidence,
++  and loss of sub-micron geometric displacement at large coordinates.
++- New mirror tests: 90-degree folding, phase/polarization, normal lab gauge,
++  local Gaussian q continuity, radial wavefront phase continuity, explicit
++  output mode-frame identity and invalid mismatched modal inputs.
++- Offline JDK21: 255/255 test-source methods in NON-JUNIT reflection shim,
++  engineering smoke 383/383, D8 smoke 18/18, D8 Decimal80 146/146,
++  retained D5/D6/D7 oracle checks 36/39/29.
++- `python tools/verify_m0.py`: JDK25 preflight BLOCKED on this host; therefore
++  actual Gradle JUnit reports, Java25 JAR, D8 NeoForge game load NOT RUN.
++- CI has JDK25 and minimum JUnit count 254; not run against a real runner here.
++
+ ## D7 optical-path checkpoint (2026-10-26)
+ 
+ - New formal JUnit5 *source* classes: `ParaxialModeFieldTest` (13),
+--- a/physics-core/src/main/java/dev/coldatomcraft/physics/optics/GeometricJonesRay.java
++++ b/physics-core/src/main/java/dev/coldatomcraft/physics/optics/GeometricJonesRay.java
+@@ -0,0 +1,85 @@
++package dev.coldatomcraft.physics.optics;
++
++import dev.coldatomcraft.physics.Vec3;
++
++/**
++ * Local geometric, monochromatic coherent ray with transverse complex
++ * travelling-mode amplitudes in sqrt(W). Not a finite-waist Gaussian solution.
++ * Geometry is in laboratory-local metres; its phase reference is a declaration.
++ */
++public record GeometricJonesRay(Vec3 referencePointMeters,
++                                RayFrame3 frame,
++                                double vacuumWavelengthMeters,
++                                String phaseReferenceKey,
++                                JonesVector amplitudeSqrtWatts) {
++    public GeometricJonesRay {
++        if (referencePointMeters == null || frame == null || amplitudeSqrtWatts == null
++                || phaseReferenceKey == null || phaseReferenceKey.isBlank()
++                || !Double.isFinite(vacuumWavelengthMeters)
++                || vacuumWavelengthMeters <= 0) {
++            throw new IllegalArgumentException("valid geometric optical ray required");
++        }
++        if (!Double.isFinite(amplitudeSqrtWatts.squaredNorm())) {
++            throw new IllegalArgumentException("ray power must be finite");
++        }
++    }
++
++    /**
++     * Explicit adapter from D7's reference plane. The geometric model has no
++     * q or Gouy-phase law. Do not advance both this ray and the D7 modal field
++     * and then sum their phases: that would double-count carrier propagation.
++     */
++    public static GeometricJonesRay atGaussianReferencePlane(
++            ParaxialModeField field, Vec3 location, RayFrame3 frame) {
++        if (field == null) throw new IllegalArgumentException("field required");
++        return new GeometricJonesRay(location, frame, field.vacuumWavelengthMeters(),
++                field.phaseReferenceKey(), field.modalAmplitudeSqrtWatts());
++    }
++
++    public double powerWatts() {
++        return amplitudeSqrtWatts.squaredNorm();
++    }
++
++    /** 3D complex field components in the port's transverse basis, sqrt(W). */
++    public LaboratoryJonesAmplitude laboratoryAmplitudeSqrtWatts() {
++        var a = amplitudeSqrtWatts.x();
++        var b = amplitudeSqrtWatts.y();
++        Vec3 x = frame.xAxis();
++        Vec3 y = frame.yAxis();
++        return new LaboratoryJonesAmplitude(
++                a.scale(x.x()).plus(b.scale(y.x())),
++                a.scale(x.y()).plus(b.scale(y.y())),
++                a.scale(x.z()).plus(b.scale(y.z())));
++    }
++
++    /**
++     * Homogeneous-medium plane-wave phase transport. Refractive index is real,
++     * positive and supplied explicitly. This does NOT propagate Gaussian q.
++     * Large coordinate/path doubles may not resolve sub-wavelength phase.
++     */
++    public GeometricJonesRay advance(double lengthMeters, double refractiveIndex) {
++        if (!Double.isFinite(lengthMeters) || lengthMeters < 0
++                || !Double.isFinite(refractiveIndex) || refractiveIndex <= 0) {
++            throw new IllegalArgumentException("nonnegative distance and real positive index required");
++        }
++        double mediumWavelength = vacuumWavelengthMeters / refractiveIndex;
++        if (!(mediumWavelength > 0) || !Double.isFinite(mediumWavelength)) {
++            throw new IllegalArgumentException("medium wavelength not representable");
++        }
++        double cycles = Math.IEEEremainder(lengthMeters, mediumWavelength) / mediumWavelength;
++        var phase = ComplexAmplitude.fromPhaseRadians(2.0 * Math.PI * cycles);
++        Vec3 nextPosition = referencePointMeters.add(frame.direction().scale(lengthMeters));
++        if (lengthMeters > 0 && nextPosition.equals(referencePointMeters)) {
++            throw new IllegalArgumentException("geometric displacement lost to floating point; use local laboratory coordinates");
++        }
++        return new GeometricJonesRay(nextPosition,
++                frame, vacuumWavelengthMeters, phaseReferenceKey,
++                amplitudeSqrtWatts.times(phase));
++    }
++
++    GeometricJonesRay withSurfaceFrame(Vec3 point, RayFrame3 surfaceFrame,
++                                       JonesVector nextAmplitude) {
++        return new GeometricJonesRay(point, surfaceFrame, vacuumWavelengthMeters,
++                phaseReferenceKey, nextAmplitude);
++    }
++}
+--- a/physics-core/src/main/java/dev/coldatomcraft/physics/optics/IdealCalibratedPlaneMirror.java
++++ b/physics-core/src/main/java/dev/coldatomcraft/physics/optics/IdealCalibratedPlaneMirror.java
+@@ -0,0 +1,78 @@
++package dev.coldatomcraft.physics.optics;
++
++/**
++ * Lossless planar specular mirror with calibrated s and p reflected phases.
++ * Real cold-atom mirrors are coated, wavelength/angle/polarization dependent;
++ * no such physical coating data is asserted here. Norms are exactly unity.
++ */
++public record IdealCalibratedPlaneMirror(OpticalPlane3 plane,
++                                         double sPhaseRadians,
++                                         double pPhaseRadians) {
++    public IdealCalibratedPlaneMirror {
++        if (plane == null || !Double.isFinite(sPhaseRadians)
++                || !Double.isFinite(pPhaseRadians)) {
++            throw new IllegalArgumentException("plane and calibrated phases required");
++        }
++    }
++
++    public record Reflection(OpticalPlane3.Hit hit, GeometricJonesRay reflected) {
++        public Reflection {
++            if (hit == null || reflected == null) {
++                throw new IllegalArgumentException("mirror result required");
++            }
++        }
++    }
++
++    /** Incident medium is VACUUM; phase advance before the mirror is k0*L. */
++    public Reflection reflect(GeometricJonesRay incident) {
++        OpticalPlane3.Hit hit = plane.intersect(incident);
++        GeometricJonesRay atPlane = incident.advance(hit.distanceMeters(), 1);
++        var incomingSP = OpticalPlane3.rotateIntoSP(atPlane, hit);
++        var reflectedSP = new JonesVector(
++                incomingSP.x().times(ComplexAmplitude.fromPhaseRadians(sPhaseRadians)),
++                incomingSP.y().times(ComplexAmplitude.fromPhaseRadians(pPhaseRadians)));
++        return new Reflection(hit, atPlane.withSurfaceFrame(hit.pointMeters(),
++                OpticalPlane3.frameFor(hit.reflectedDirection(), hit.s()), reflectedSP));
++    }
++
++    /**
++     * For a narrow angular-spectrum vacuum Gaussian, a planar mirror flips the
++     * A FLAT mirror leaves q unchanged at its surface in the new forward
++     * propagation coordinate: q_out = q_in. Its LAB transverse field must
++     * remain continuous up to the explicitly supplied coating coefficient.
++     * In particular, a divergent beam stays divergent after a flat mirror;
++     * a phase-conjugating mirror would be a different physical component.
++     * Does not calculate coating or nonparaxial distortion.
++     *
++     * <p>The input modal state MUST already be at the mirror plane; this method
++     * does not advance it. Its matching input geometric ray must be at the same
++     * plane and carry the EXACT same complex modal amplitude. An explicit new
++     * mode-frame reference key is required after the physical direction flip.</p>
++     */
++    public ParaxialModeField reflectGaussianModeAtPlane(
++            ParaxialModeField modeAtPlane, GeometricJonesRay geometricAtPlane,
++            String calibratedOutgoingModeFrameKey) {
++        if (modeAtPlane == null || geometricAtPlane == null
++                || calibratedOutgoingModeFrameKey == null
++                || calibratedOutgoingModeFrameKey.isBlank()) {
++            throw new IllegalArgumentException("matched Gaussian mirror inputs required");
++        }
++        if (calibratedOutgoingModeFrameKey.equals(modeAtPlane.modeFrameKey())) {
++            throw new IllegalArgumentException("physical reflection requires a distinct outgoing mode-frame declaration");
++        }
++        if (!modeAtPlane.phaseReferenceKey().equals(geometricAtPlane.phaseReferenceKey())
++                || modeAtPlane.vacuumWavelengthMeters() != geometricAtPlane.vacuumWavelengthMeters()
++                || !modeAtPlane.modalAmplitudeSqrtWatts().equals(geometricAtPlane.amplitudeSqrtWatts())) {
++            throw new IllegalArgumentException("mode and geometric port amplitudes/phase must match");
++        }
++        OpticalPlane3.Hit hit = plane.intersect(geometricAtPlane);
++        if (hit.distanceMeters() != 0.0) {
++            throw new IllegalArgumentException("Gaussian modal state must already be at the mirror plane");
++        }
++        Reflection reflected = reflect(geometricAtPlane);
++        GaussianQ q = modeAtPlane.q();
++        return new ParaxialModeField(modeAtPlane.phaseReferenceKey(),
++                calibratedOutgoingModeFrameKey, modeAtPlane.vacuumWavelengthMeters(),
++                q, reflected.reflected().amplitudeSqrtWatts());
++    }
++}
+--- a/physics-core/src/main/java/dev/coldatomcraft/physics/optics/LaboratoryJonesAmplitude.java
++++ b/physics-core/src/main/java/dev/coldatomcraft/physics/optics/LaboratoryJonesAmplitude.java
+@@ -0,0 +1,15 @@
++package dev.coldatomcraft.physics.optics;
++
++/** Complex Cartesian traveling-mode amplitude in sqrt(W), NOT V/m or sqrt(W/m^2). */
++public record LaboratoryJonesAmplitude(ComplexAmplitude x,
++                                        ComplexAmplitude y,
++                                        ComplexAmplitude z) {
++    public LaboratoryJonesAmplitude {
++        if (x == null || y == null || z == null) {
++            throw new IllegalArgumentException("all lab Jones components required");
++        }
++    }
++    public double squaredNormWatts() {
++        return x.magnitudeSquared() + y.magnitudeSquared() + z.magnitudeSquared();
++    }
++}
+--- a/physics-core/src/main/java/dev/coldatomcraft/physics/optics/OpticalPlane3.java
++++ b/physics-core/src/main/java/dev/coldatomcraft/physics/optics/OpticalPlane3.java
+@@ -0,0 +1,69 @@
++package dev.coldatomcraft.physics.optics;
++
++import dev.coldatomcraft.physics.Vec3;
++
++/**
++ * A flat, unbounded optical surface with its unit normal pointing from
++ * incident medium n1 into transmitted medium n2. Intersection is only valid
++ * for front-side incidence. Material identity and block geometry are NOT given.
++ */
++public record OpticalPlane3(Vec3 pointMeters, Vec3 normal1To2) {
++    private static final double MIN_COSINE = 1e-12;
++    private static final double NORMAL_DEGENERACY = 1e-12;
++
++    public OpticalPlane3 {
++        if (pointMeters == null || normal1To2 == null) {
++            throw new IllegalArgumentException("plane point and normal required");
++        }
++        normal1To2 = normal1To2.normalized();
++    }
++
++    public record Hit(double distanceMeters, Vec3 pointMeters, double cosineIncident,
++                      Vec3 s, Vec3 pIncident, Vec3 pReflected, Vec3 reflectedDirection) {
++        public Hit {
++            if (!Double.isFinite(distanceMeters) || distanceMeters < 0
++                    || pointMeters == null || s == null || pIncident == null
++                    || pReflected == null || reflectedDirection == null
++                    || !(cosineIncident > 0)) {
++                throw new IllegalArgumentException("valid planar optical hit required");
++            }
++        }
++    }
++
++    /** Pure geometry; no reflectance, Fresnel amplitudes or propagation phase. */
++    public Hit intersect(GeometricJonesRay incident) {
++        if (incident == null) throw new IllegalArgumentException("incident ray required");
++        Vec3 k = incident.frame().direction();
++        double cos = k.dot(normal1To2);
++        if (cos <= MIN_COSINE) {
++            throw new IllegalArgumentException("surface requires non-grazing front-face incidence");
++        }
++        double t = pointMeters.subtract(incident.referencePointMeters()).dot(normal1To2) / cos;
++        if (!Double.isFinite(t) || t < 0) {
++            throw new IllegalArgumentException("plane intersection behind ray origin or not finite");
++        }
++        Vec3 hitPoint = incident.referencePointMeters().add(k.scale(t));
++        Vec3 kReflected = k.subtract(normal1To2.scale(2 * cos)).normalized();
++        // s is perpendicular to the plane of incidence. At exact normal
++        // incidence the incidence plane is undefined: use the input x axis
++        // as a declared continuous gauge, never the global world X axis.
++        Vec3 sHint = normal1To2.cross(k);
++        Vec3 s = sHint.magnitude() <= NORMAL_DEGENERACY
++                ? incident.frame().xAxis() : sHint.normalized();
++        Vec3 pIncident = k.cross(s).normalized();
++        Vec3 pReflected = kReflected.cross(s).normalized();
++        return new Hit(t, hitPoint, cos, s, pIncident, pReflected, kReflected);
++    }
++
++    static JonesVector rotateIntoSP(GeometricJonesRay incident, Hit hit) {
++        Vec3 x = incident.frame().xAxis();
++        Vec3 y = incident.frame().yAxis();
++        JonesVector a = incident.amplitudeSqrtWatts();
++        return new JonesVector(a.x().scale(x.dot(hit.s())).plus(a.y().scale(y.dot(hit.s()))),
++                a.x().scale(x.dot(hit.pIncident())).plus(a.y().scale(y.dot(hit.pIncident()))));
++    }
++
++    static RayFrame3 frameFor(Vec3 direction, Vec3 s) {
++        return new RayFrame3(direction, s, direction.cross(s).normalized());
++    }
++}
+--- a/physics-core/src/main/java/dev/coldatomcraft/physics/optics/PlanarFresnelInterface.java
++++ b/physics-core/src/main/java/dev/coldatomcraft/physics/optics/PlanarFresnelInterface.java
+@@ -0,0 +1,152 @@
++package dev.coldatomcraft.physics.optics;
++
++import dev.coldatomcraft.physics.Vec3;
++import java.util.Optional;
++
++/**
++ * Single planar, uncoated, non-absorbing, isotropic and non-magnetic interface
++ * between REAL, positive refractive indices. Applies plane-wave s/p Fresnel
++ * amplitudes at the central ray of a paraxial optical beam. This is NOT a
++ * multilayer dielectric mirror, finite beam angular-spectrum solver, or heat
++ * deposition model.
++ *
++ * <p>Convention: exp(-i omega t); s=normalize(N cross k_incident),
++ * p_j=k_j cross s, s cross p_j=k_j. At normal incidence use the input port x
++ * axis as the s gauge. Fresnel r_p is relative to the REFLECTED p basis, so
++ * r_p=-r_s at normal incidence (their LAB E-reflections have the same sign).
++ * For transmitted travelling-mode amplitudes in sqrt(W), the Fresnel electric
++ * transmission t must be multiplied by sqrt(n2*cos(theta_t)/(n1*cos(theta_i))).</p>
++ */
++public record PlanarFresnelInterface(OpticalPlane3 plane,
++                                     double incidentIndex,
++                                     double transmittedIndex) {
++    public PlanarFresnelInterface {
++        if (plane == null || !Double.isFinite(incidentIndex) || !(incidentIndex > 0)
++                || !Double.isFinite(transmittedIndex) || !(transmittedIndex > 0)) {
++            throw new IllegalArgumentException("plane and real positive refractive indices required");
++        }
++    }
++
++    public record Coefficients(ComplexAmplitude rS, ComplexAmplitude rP,
++                               ComplexAmplitude tSElectric, ComplexAmplitude tPElectric,
++                               double transmissionAmplitudeFluxScale,
++                               double incidentCosine, double transmittedCosine,
++                               boolean totalInternalReflection) {
++        public Coefficients {
++            if (rS == null || rP == null || tSElectric == null || tPElectric == null
++                    || !Double.isFinite(transmissionAmplitudeFluxScale)
++                    || transmissionAmplitudeFluxScale < 0
++                    || !Double.isFinite(incidentCosine) || !(incidentCosine > 0)
++                    || !Double.isFinite(transmittedCosine) || transmittedCosine < 0) {
++                throw new IllegalArgumentException("Fresnel coefficients must be finite");
++            }
++        }
++        /** Power reflectance for a purely s incident wave. */
++        public double reflectanceS() { return rS.magnitudeSquared(); }
++        /** Power reflectance for a purely p incident wave. */
++        public double reflectanceP() { return rP.magnitudeSquared(); }
++        /** Power transmittance for a purely s incident wave; no propagating TIR mode. */
++        public double transmittanceS() {
++            return tSElectric.magnitudeSquared() * transmissionAmplitudeFluxScale
++                    * transmissionAmplitudeFluxScale;
++        }
++        public double transmittanceP() {
++            return tPElectric.magnitudeSquared() * transmissionAmplitudeFluxScale
++                    * transmissionAmplitudeFluxScale;
++        }
++    }
++
++    public record Interaction(OpticalPlane3.Hit hit,
++                              GeometricJonesRay incidentAtSurface,
++                              GeometricJonesRay reflected,
++                              Optional<GeometricJonesRay> transmitted,
++                              Coefficients coefficients) {
++        public Interaction {
++            if (hit == null || incidentAtSurface == null || reflected == null
++                    || transmitted == null || coefficients == null) {
++                throw new IllegalArgumentException("complete Fresnel interaction required");
++            }
++        }
++        public double outputPowerWatts() {
++            return reflected.powerWatts()
++                    + transmitted.map(GeometricJonesRay::powerWatts).orElse(0.0);
++        }
++    }
++
++    public Interaction scatter(GeometricJonesRay incident) {
++        OpticalPlane3.Hit hit = plane.intersect(incident);
++        GeometricJonesRay surfaceInput = incident.advance(hit.distanceMeters(), incidentIndex);
++        double ci = hit.cosineIncident();
++        // Ratio is evaluated only once and must be representable; the very
++        // extreme n1/n2 regime needs a different numerical treatment.
++        double eta = incidentIndex / transmittedIndex;
++        if (!Double.isFinite(eta)) {
++            throw new IllegalArgumentException("index ratio not representable");
++        }
++        double sin2i = Math.max(0.0, 1.0 - ci * ci);
++        double sin2t = (eta * eta) * sin2i;
++        if (!Double.isFinite(sin2t)) {
++            throw new IllegalArgumentException("Snell refracted sine not representable");
++        }
++        boolean tir = sin2t >= 1.0;
++        ComplexAmplitude rs, rp, ts, tp;
++        double ct = 0.0, fluxScale = 0.0;
++        Vec3 kTransmitted = null;
++
++        if (tir) {
++            // A single infinite interface supports an evanescent transmitted
++            // field, but no outgoing transmitted travelling-power ray. The
++            // evanescent field is not represented by this API.
++            double alpha = Math.sqrt(Math.max(0, sin2t - 1));
++            rs = ComplexAmplitude.fromPhaseRadians(-2 * Math.atan2(transmittedIndex * alpha,
++                    incidentIndex * ci));
++            rp = ComplexAmplitude.fromPhaseRadians(-2 * Math.atan2(incidentIndex * alpha,
++                    transmittedIndex * ci));
++            ts = ComplexAmplitude.ZERO;
++            tp = ComplexAmplitude.ZERO;
++        } else {
++            ct = Math.sqrt(Math.max(0.0, 1.0 - sin2t));
++            double n1ci = incidentIndex * ci;
++            double n2ct = transmittedIndex * ct;
++            double denomS = n1ci + n2ct;
++            double denomP = transmittedIndex * ci + incidentIndex * ct;
++            if (!(denomS > 0) || !(denomP > 0) || !Double.isFinite(denomS)
++                    || !Double.isFinite(denomP)) {
++                throw new IllegalArgumentException("unrepresentable Fresnel denominators");
++            }
++            rs = new ComplexAmplitude((n1ci - n2ct) / denomS, 0);
++            rp = new ComplexAmplitude((transmittedIndex * ci - incidentIndex * ct) / denomP, 0);
++            ts = new ComplexAmplitude(2 * n1ci / denomS, 0);
++            tp = new ComplexAmplitude(2 * n1ci / denomP, 0);
++            fluxScale = Math.sqrt(n2ct / n1ci);
++            Vec3 ki = incident.frame().direction();
++            kTransmitted = ki.subtract(plane.normal1To2().scale(ci)).scale(eta)
++                    .add(plane.normal1To2().scale(ct)).normalized();
++        }
++
++        Coefficients coeffs = new Coefficients(rs, rp, ts, tp,
++                fluxScale, ci, ct, tir);
++        JonesVector incomingSP = OpticalPlane3.rotateIntoSP(surfaceInput, hit);
++        var reflectedSP = new JonesVector(incomingSP.x().times(rs), incomingSP.y().times(rp));
++        var reflectedFrame = OpticalPlane3.frameFor(hit.reflectedDirection(), hit.s());
++        var reflected = surfaceInput.withSurfaceFrame(hit.pointMeters(), reflectedFrame, reflectedSP);
++        Optional<GeometricJonesRay> transmitted = Optional.empty();
++        if (!tir) {
++            var transmittedSP = new JonesVector(
++                    incomingSP.x().times(ts).scale(fluxScale),
++                    incomingSP.y().times(tp).scale(fluxScale));
++            var transmitFrame = OpticalPlane3.frameFor(kTransmitted, hit.s());
++            transmitted = Optional.of(surfaceInput.withSurfaceFrame(
++                    hit.pointMeters(), transmitFrame, transmittedSP));
++        }
++        // A normalized plane-wave model is strictly passive. Guard against
++        // signs or missing flux factors when changing polarization gauges.
++        double inputPower = surfaceInput.powerWatts();
++        double outputPower = reflected.powerWatts()
++                + transmitted.map(GeometricJonesRay::powerWatts).orElse(0.0);
++        if (Math.abs(inputPower - outputPower) > 3e-11 * Math.max(inputPower, 1e-300)) {
++            throw new ArithmeticException("Fresnel travelling-mode energy conservation failed");
++        }
++        return new Interaction(hit, surfaceInput, reflected, transmitted, coeffs);
++    }
++}
+--- a/physics-core/src/main/java/dev/coldatomcraft/physics/optics/RayFrame3.java
++++ b/physics-core/src/main/java/dev/coldatomcraft/physics/optics/RayFrame3.java
+@@ -0,0 +1,44 @@
++package dev.coldatomcraft.physics.optics;
++
++import dev.coldatomcraft.physics.Vec3;
++
++/**
++ * Right-handed orthonormal laboratory frame: x cross y = direction.
++ * Axes are dimensionless. This frame is a declaration of an optical port,
++ * not a calibrated beam alignment measurement.
++ */
++public record RayFrame3(Vec3 direction, Vec3 xAxis, Vec3 yAxis) {
++    private static final double TOLERANCE = 1e-10;
++
++    public RayFrame3 {
++        if (direction == null || xAxis == null || yAxis == null) {
++            throw new IllegalArgumentException("all ray-frame vectors required");
++        }
++        if (Math.abs(direction.magnitude() - 1) > TOLERANCE
++                || Math.abs(xAxis.magnitude() - 1) > TOLERANCE
++                || Math.abs(yAxis.magnitude() - 1) > TOLERANCE
++                || Math.abs(direction.dot(xAxis)) > TOLERANCE
++                || Math.abs(direction.dot(yAxis)) > TOLERANCE
++                || Math.abs(xAxis.dot(yAxis)) > TOLERANCE
++                || xAxis.cross(yAxis).dot(direction) < 1 - TOLERANCE) {
++            throw new IllegalArgumentException("ray frame must be orthonormal and right handed");
++        }
++    }
++
++    /** Construct a local frame using a measured/declared transverse-axis hint. */
++    public static RayFrame3 fromDirectionAndXAxis(Vec3 direction, Vec3 xAxisHint) {
++        if (direction == null || xAxisHint == null) {
++            throw new IllegalArgumentException("direction and transverse hint required");
++        }
++        Vec3 k = direction.normalized();
++        // Avoid cancellation by removing the projection from the normalized hint.
++        Vec3 hint = xAxisHint.normalized();
++        Vec3 transverse = hint.subtract(k.scale(hint.dot(k)));
++        if (transverse.magnitude() <= 1e-12) {
++            throw new IllegalArgumentException("transverse hint parallel to ray direction");
++        }
++        Vec3 x = transverse.normalized();
++        Vec3 y = k.cross(x).normalized();
++        return new RayFrame3(k, x, y);
++    }
++}
+--- a/physics-core/src/test/java/dev/coldatomcraft/physics/optics/IdealCalibratedPlaneMirrorTest.java
++++ b/physics-core/src/test/java/dev/coldatomcraft/physics/optics/IdealCalibratedPlaneMirrorTest.java
+@@ -0,0 +1,121 @@
++package dev.coldatomcraft.physics.optics;
++
++import dev.coldatomcraft.physics.Vec3;
++import org.junit.jupiter.api.Test;
++import static org.junit.jupiter.api.Assertions.*;
++
++class IdealCalibratedPlaneMirrorTest {
++    private static final Vec3 X=new Vec3(1,0,0),Y=new Vec3(0,1,0),Z=new Vec3(0,0,1);
++    private static GeometricJonesRay incident(Vec3 direction, Vec3 location, JonesVector polarization) {
++        return new GeometricJonesRay(location,RayFrame3.fromDirectionAndXAxis(direction,Y),
++                780e-9,"laser",polarization);
++    }
++    private static void near(double a,double b) {
++        assertEquals(b,a,1e-10*Math.max(1,Math.abs(b)));
++    }
++    @Test void fortyFiveDegreeMirrorTurnsBeamThroughRightAngle() {
++        var plane=new OpticalPlane3(new Vec3(0,0,0),new Vec3(-1,0,1));
++        var mirror=new IdealCalibratedPlaneMirror(plane,0,0);
++        var result=mirror.reflect(incident(Z,new Vec3(0,0,-1),JonesVector.horizontal()));
++        near(result.reflected().frame().direction().x(),1);
++        near(result.reflected().frame().direction().z(),0);
++        near(result.reflected().powerWatts(),1);
++        near(result.hit().distanceMeters(),1);
++    }
++    @Test void sAndPPhasesTransformPolarizationWithoutAddingPower() {
++        var mirror=new IdealCalibratedPlaneMirror(new OpticalPlane3(new Vec3(0,0,0),Z),
++                0,Math.PI/2);
++        var ray=incident(Z,new Vec3(0,0,0),JonesVector.linearRadians(Math.PI/4));
++        var result=mirror.reflect(ray).reflected();
++        near(result.powerWatts(),1);
++        near(result.amplitudeSqrtWatts().x().real(),Math.sqrt(.5));
++        near(result.amplitudeSqrtWatts().y().imaginary(),Math.sqrt(.5));
++        assertEquals(-Z.z(),result.frame().direction().z(),1e-12);
++    }
++    @Test void mirrorWithSamePhaseHasSamePhysicalLabPolarizationSign() {
++        var m=new IdealCalibratedPlaneMirror(new OpticalPlane3(new Vec3(0,0,0),Z),0,Math.PI);
++        var r=m.reflect(incident(Z,new Vec3(0,0,0),JonesVector.vertical())).reflected();
++        // Incoming p points -X, reflected p points +X; phase pi restores -X.
++        near(r.laboratoryAmplitudeSqrtWatts().x().real(),-1);
++    }
++    @Test void oppositeDirectionAfterReflectionAndNoGeometricalJitter() {
++        var m=new IdealCalibratedPlaneMirror(new OpticalPlane3(new Vec3(0,0,0),Z),0,0);
++        var r=m.reflect(incident(Z,new Vec3(0,0,-1),JonesVector.horizontal()));
++        near(r.reflected().referencePointMeters().z(),0);
++        near(r.reflected().frame().direction().z(),-1);
++        near(r.reflected().powerWatts(),1);
++    }
++    @Test void flatMirrorPreservesLocalCurvatureAndRayleighRange() {
++        var mode=ParaxialModeField.fromPlane("laser","incoming-frame",new GaussianPlane(
++                .04,780e-9,new GaussianQ(.125,1.01)),JonesVector.horizontal(),0.2);
++        var geom=GeometricJonesRay.atGaussianReferencePlane(mode,new Vec3(0,0,0),
++                RayFrame3.fromDirectionAndXAxis(Z,Y));
++        var m=new IdealCalibratedPlaneMirror(new OpticalPlane3(new Vec3(0,0,0),Z),.4,.6);
++        var reflected=m.reflectGaussianModeAtPlane(mode,geom,"outgoing-frame");
++        near(reflected.q().realMeters(),.125);
++        near(reflected.q().imaginaryMeters(),1.01);
++        near(reflected.gaussianPlane().radiusMeters(),mode.gaussianPlane().radiusMeters());
++        near(reflected.powerWatts(),.04);
++        assertEquals("outgoing-frame",reflected.modeFrameKey());
++        assertEquals(mode.phaseReferenceKey(),reflected.phaseReferenceKey());
++    }
++    @Test void mirrorDoesNotInventGaussianPropagationPhase() {
++        var mode=ParaxialModeField.fromPlane("laser","before",new GaussianPlane(.01,780e-9,
++                new GaussianQ(0,.7)),JonesVector.horizontal(),0);
++        var geom=GeometricJonesRay.atGaussianReferencePlane(mode,new Vec3(0,0,-1),
++                RayFrame3.fromDirectionAndXAxis(Z,Y));
++        var mirror=new IdealCalibratedPlaneMirror(new OpticalPlane3(new Vec3(0,0,0),Z),0,0);
++        assertThrows(IllegalArgumentException.class,()->mirror.reflectGaussianModeAtPlane(
++                mode,geom,"after"));
++        var propagated=mode.freeSpace(1);
++        var incidentAtMirror=GeometricJonesRay.atGaussianReferencePlane(propagated,
++                new Vec3(0,0,0),geom.frame());
++        var reflected=mirror.reflectGaussianModeAtPlane(propagated,incidentAtMirror,"after");
++        near(reflected.q().realMeters(),1);
++        near(reflected.q().imaginaryMeters(),.7);
++        near(reflected.powerWatts(),.01);
++    }
++    @Test void radialWavefrontPhaseIsContinuousAtFlatMirror() {
++        var mode=ParaxialModeField.fromPlane("laser","incoming",new GaussianPlane(
++                .015,780e-9,new GaussianQ(.2,.8)), JonesVector.horizontal(),0.31);
++        var geometric=GeometricJonesRay.atGaussianReferencePlane(mode,new Vec3(0,0,0),
++                RayFrame3.fromDirectionAndXAxis(Z,Y));
++        double phase=.47;
++        var mirror=new IdealCalibratedPlaneMirror(new OpticalPlane3(new Vec3(0,0,0),Z),phase,.84);
++        var output=mirror.reflectGaussianModeAtPlane(mode,geometric,"outgoing");
++        var coating=ComplexAmplitude.fromPhaseRadians(phase);
++        for(double r: new double[]{0,.0001,.0002,.0005}) {
++            var before=mode.fieldAtRadiusMeters(r).x();
++            var after=output.fieldAtRadiusMeters(r).x();
++            var predicted=before.times(coating);
++            near(after.real(),predicted.real());
++            near(after.imaginary(),predicted.imaginary());
++        }
++    }
++    @Test void gaussianMirrorRejectsAmplitudeMismatch() {
++        var mode=ParaxialModeField.fromPlane("laser","one",new GaussianPlane(.01,780e-9,
++                new GaussianQ(.1,.7)),JonesVector.horizontal(),0);
++        var geo=GeometricJonesRay.atGaussianReferencePlane(mode,new Vec3(0,0,0),
++                RayFrame3.fromDirectionAndXAxis(Z,Y));
++        var modified=new GeometricJonesRay(geo.referencePointMeters(),geo.frame(),780e-9,
++                geo.phaseReferenceKey(),geo.amplitudeSqrtWatts().scale(.5));
++        var mirror=new IdealCalibratedPlaneMirror(new OpticalPlane3(new Vec3(0,0,0),Z),0,0);
++        assertThrows(IllegalArgumentException.class,()->mirror.reflectGaussianModeAtPlane(
++                mode,modified,"out"));
++    }
++    @Test void mirrorReflectedPortMustNotReuseIncomingFrameIdentity() {
++        var mode=ParaxialModeField.fromPlane("laser","in-port",new GaussianPlane(
++                .01,780e-9,new GaussianQ(.1,.8)),JonesVector.horizontal(),0);
++        var geom=GeometricJonesRay.atGaussianReferencePlane(mode,new Vec3(0,0,0),
++                RayFrame3.fromDirectionAndXAxis(Z,Y));
++        var mirror=new IdealCalibratedPlaneMirror(new OpticalPlane3(new Vec3(0,0,0),Z),0,0);
++        assertThrows(IllegalArgumentException.class,()->mirror.reflectGaussianModeAtPlane(
++                mode,geom,"in-port"));
++    }
++    @Test void mirrorDoesNotCreateEnergyFromZeroInput() {
++        var zero=incident(Z,new Vec3(0,0,0),new JonesVector(
++                ComplexAmplitude.ZERO,ComplexAmplitude.ZERO));
++        var mirror=new IdealCalibratedPlaneMirror(new OpticalPlane3(new Vec3(0,0,0),Z),.8,-1.5);
++        near(mirror.reflect(zero).reflected().powerWatts(),0);
++    }
++}
+--- a/physics-core/src/test/java/dev/coldatomcraft/physics/optics/PlanarFresnelInterfaceTest.java
++++ b/physics-core/src/test/java/dev/coldatomcraft/physics/optics/PlanarFresnelInterfaceTest.java
+@@ -0,0 +1,223 @@
++package dev.coldatomcraft.physics.optics;
++
++import dev.coldatomcraft.physics.Vec3;
++import org.junit.jupiter.api.Test;
++import static org.junit.jupiter.api.Assertions.*;
++
++class PlanarFresnelInterfaceTest {
++    private static final Vec3 X=new Vec3(1,0,0), Y=new Vec3(0,1,0), Z=new Vec3(0,0,1);
++    private static final double LAMBDA=780e-9;
++    private static final OpticalPlane3 PLANE=new OpticalPlane3(new Vec3(0,0,0),Z);
++    private static GeometricJonesRay ray(double angle, JonesVector jones) {
++        Vec3 k=new Vec3(Math.sin(angle),0,Math.cos(angle));
++        return new GeometricJonesRay(new Vec3(0,0,-1),
++                RayFrame3.fromDirectionAndXAxis(k,Y), LAMBDA,"laser",jones);
++    }
++    private static GeometricJonesRay rayAtSurface(double angle, JonesVector jones) {
++        var initial=ray(angle,jones);
++        return new GeometricJonesRay(new Vec3(0,0,0),initial.frame(),LAMBDA,
++                "laser",jones);
++    }
++    private static void near(double actual,double expected) {
++        assertEquals(expected,actual,2e-11*Math.max(1,Math.abs(expected)));
++    }
++    @Test void normalIncidenceScalarFresnelAndPowerNormalizedTransmission() {
++        var interaction=new PlanarFresnelInterface(PLANE,1,1.5)
++                .scatter(rayAtSurface(0,JonesVector.horizontal().scale(Math.sqrt(0.020))));
++        var c=interaction.coefficients();
++        near(c.rS().real(),-0.2);
++        near(c.rP().real(),0.2);
++        near(c.tSElectric().real(),0.8);
++        near(c.tPElectric().real(),0.8);
++        near(c.transmittanceS(),0.96);
++        near(c.transmittanceP(),0.96);
++        near(c.reflectanceS(),0.04);
++        near(interaction.reflected().powerWatts(),0.0008);
++        near(interaction.transmitted().orElseThrow().powerWatts(),0.0192);
++        near(interaction.outputPowerWatts(),0.020);
++        // At normal incidence s and p Fresnel r have OPPOSITE scalar signs,
++        // because the REFLECTED p unit vector flips relative to incoming p.
++        near(interaction.reflected().laboratoryAmplitudeSqrtWatts().y().real(),
++                -0.2*Math.sqrt(0.020));
++    }
++    @Test void obliqueSnellAndSpecularReflection() {
++        double theta=Math.toRadians(40);
++        var interaction=new PlanarFresnelInterface(PLANE,1,1.5)
++                .scatter(ray(theta,JonesVector.linearRadians(0.3)));
++        near(interaction.reflected().frame().direction().z(),-Math.cos(theta));
++        near(interaction.reflected().frame().direction().x(),Math.sin(theta));
++        var refracted=interaction.transmitted().orElseThrow();
++        near(refracted.frame().direction().x(),Math.sin(theta)/1.5);
++        near(refracted.frame().direction().magnitude(),1);
++        near(interaction.outputPowerWatts(),1);
++        near(interaction.hit().pointMeters().z(),0);
++        near(interaction.hit().distanceMeters(),1/Math.cos(theta));
++    }
++    @Test void brewsterAngleEliminatesPReflectanceNotS() {
++        double angle=Math.atan(1.5);
++        var p=new PlanarFresnelInterface(PLANE,1,1.5)
++                .scatter(ray(angle,JonesVector.vertical()));
++        near(p.coefficients().rP().real(),0);
++        near(p.reflected().powerWatts(),0);
++        near(p.transmitted().orElseThrow().powerWatts(),1);
++        var s=new PlanarFresnelInterface(PLANE,1,1.5)
++                .scatter(ray(angle,JonesVector.horizontal()));
++        assertTrue(s.reflected().powerWatts()>0.10);
++    }
++    @Test void totalInternalReflectionHasNoPropagatingOutputAndComplexPolarizationPhase() {
++        var interaction=new PlanarFresnelInterface(PLANE,1.5,1)
++                .scatter(ray(Math.toRadians(60), JonesVector.linearRadians(Math.PI/4)));
++        assertTrue(interaction.coefficients().totalInternalReflection());
++        assertTrue(interaction.transmitted().isEmpty());
++        near(interaction.outputPowerWatts(),1);
++        near(interaction.coefficients().reflectanceS(),1);
++        near(interaction.coefficients().reflectanceP(),1);
++        assertTrue(Math.abs(interaction.coefficients().rS().imaginary())>0.1);
++        assertTrue(Math.abs(interaction.coefficients().rP().imaginary())>0.1);
++        assertTrue(Math.abs(interaction.coefficients().rS().imaginary()
++                -interaction.coefficients().rP().imaginary())>0.01);
++    }
++    @Test void randomLinearPolarizationPowerConservationAcrossAngles() {
++        var interface1=new PlanarFresnelInterface(PLANE,1,1.52);
++        for(int j=0;j<80;j++) {
++            double theta=(j+1)*Math.PI/200;
++            double a=(j*17.0)/19.0;
++            var result=interface1.scatter(ray(theta,JonesVector.linearRadians(a).scale(Math.sqrt(0.02))));
++            near(result.outputPowerWatts(),0.02);
++            assertTrue(result.coefficients().transmittanceS()>=0);
++            assertTrue(result.coefficients().transmittanceP()>=0);
++        }
++    }
++    @Test void incidenceBasisGaugeDoesNotChangePhysicalLabOutput() {
++        var in=ray(Math.PI/5,JonesVector.linearRadians(.34));
++        // Rotate the incoming port basis by 90 degrees but preserve the
++        // SAME physical lab polarization via Jones (-b, a) in new basis.
++        var u=in.frame().xAxis(); var v=in.frame().yAxis(); var d=in.frame().direction();
++        var newFrame=new RayFrame3(d,v,u.scale(-1));
++        var a=in.amplitudeSqrtWatts();
++        var rotated=new JonesVector(a.y(),a.x().scale(-1));
++        var in2=new GeometricJonesRay(in.referencePointMeters(),newFrame,LAMBDA,"laser",rotated);
++        assertEquals(in.laboratoryAmplitudeSqrtWatts(),in2.laboratoryAmplitudeSqrtWatts());
++        var splitter=new PlanarFresnelInterface(PLANE,1,1.45);
++        var result1=splitter.scatter(in);
++        var result2=splitter.scatter(in2);
++        assertEquals(result1.reflected().laboratoryAmplitudeSqrtWatts(),
++                result2.reflected().laboratoryAmplitudeSqrtWatts());
++        assertEquals(result1.transmitted().orElseThrow().laboratoryAmplitudeSqrtWatts(),
++                result2.transmitted().orElseThrow().laboratoryAmplitudeSqrtWatts());
++    }
++    @Test void tangentialElectricFieldIsContinuousInBothPolarizations() {
++        // The transmitted port contains sqrt(W), not the raw E amplitude.
++        // Divide by sqrt(eta_transmit/eta_incident) to compare E-boundary
++        // conditions; otherwise an erroneous raw-t-in-sqrtW model can pass
++        // field continuity tests or violate energy conservation.
++        for(double angle: new double[]{0,.2,.65,1.05}) {
++            var incoming=rayAtSurface(angle,JonesVector.linearRadians(.71));
++            var result=new PlanarFresnelInterface(PLANE,1,1.5).scatter(incoming);
++            var i=incoming.laboratoryAmplitudeSqrtWatts();
++            var r=result.reflected().laboratoryAmplitudeSqrtWatts();
++            var t=result.transmitted().orElseThrow().laboratoryAmplitudeSqrtWatts();
++            double invScale=1/result.coefficients().transmissionAmplitudeFluxScale();
++            near(i.x().real()+r.x().real(),t.x().real()*invScale);
++            near(i.y().real()+r.y().real(),t.y().real()*invScale);
++            near(i.x().imaginary()+r.x().imaginary(),t.x().imaginary()*invScale);
++            near(i.y().imaginary()+r.y().imaginary(),t.y().imaginary()*invScale);
++        }
++    }
++    @Test void nearCriticalAngleRemainsEnergyConservingWithoutFakeTransmissionUnderTIR() {
++        var iface=new PlanarFresnelInterface(PLANE,1.5,1);
++        var below=iface.scatter(ray(Math.toRadians(41.8),JonesVector.linearRadians(.3)));
++        var above=iface.scatter(ray(Math.toRadians(41.9),JonesVector.linearRadians(.3)));
++        assertFalse(below.coefficients().totalInternalReflection());
++        assertTrue(below.transmitted().isPresent());
++        assertTrue(above.coefficients().totalInternalReflection());
++        assertTrue(above.transmitted().isEmpty());
++        near(below.outputPowerWatts(),1);
++        near(above.outputPowerWatts(),1);
++    }
++    @Test void consecutiveInterfacesRequireExplicitAccountingForEveryReflectedBranch() {
++        var front=new PlanarFresnelInterface(PLANE,1,1.5)
++                .scatter(rayAtSurface(0,JonesVector.horizontal()));
++        var exitPlane=new OpticalPlane3(new Vec3(0,0,.01),Z);
++        var rear=new PlanarFresnelInterface(exitPlane,1.5,1)
++                .scatter(front.transmitted().orElseThrow());
++        near(front.reflected().powerWatts(),.04);
++        near(rear.reflected().powerWatts(),.96*.04);
++        near(rear.transmitted().orElseThrow().powerWatts(),.96*.96);
++        near(front.reflected().powerWatts()+rear.outputPowerWatts(),1);
++        // This tree is only the first two surface interactions. The light
++        // reflected inside the slab will hit the FRONT boundary again,
++        // which is explicitly outside this single-branch test.
++    }
++    @Test void arbitraryThreeDimensionalSurfaceNormalObeysSpecularAndSnellLaws() {
++        var n=new Vec3(.2,-.4,.9).normalized();
++        var k=new Vec3(.1,.15,.98).normalized();
++        var spot=new Vec3(1.25,-2.5,3.0);
++        var ray=new GeometricJonesRay(spot.subtract(k.scale(.3)),
++                RayFrame3.fromDirectionAndXAxis(k,new Vec3(1,0,0)),LAMBDA,"3d-lab",
++                JonesVector.linearRadians(.34));
++        var result=new PlanarFresnelInterface(new OpticalPlane3(spot,n),1,1.52).scatter(ray);
++        near(result.hit().distanceMeters(),.3);
++        near(result.hit().pointMeters().subtract(spot).magnitude(),0);
++        var kr=result.reflected().frame().direction();
++        near(kr.dot(n),-k.dot(n));
++        near(kr.subtract(k.subtract(n.scale(2*k.dot(n)))).magnitude(),0);
++        var kt=result.transmitted().orElseThrow().frame().direction();
++        near(kt.subtract(n.scale(kt.dot(n))).magnitude(),
++                k.subtract(n.scale(k.dot(n))).magnitude()/1.52);
++        near(result.outputPowerWatts(),1);
++        near(result.reflected().frame().xAxis().dot(kr),0);
++        near(result.transmitted().orElseThrow().frame().xAxis().dot(kt),0);
++    }
++    private static Vec3 rotate90(Vec3 a) { return new Vec3(-a.y(),a.x(),a.z()); }
++    private static void sameComplex(ComplexAmplitude a, ComplexAmplitude b) {
++        near(a.real(),b.real()); near(a.imaginary(),b.imaginary());
++    }
++    @Test void rotatingEntireExperimentChangesOnlyLaboratoryCoordinates() {
++        var normal=new Vec3(.15,.23,.96).normalized();
++        var k=new Vec3(.28,-.24,.92).normalized();
++        var center=new Vec3(.1,.2,.3);
++        var original=new GeometricJonesRay(center.subtract(k.scale(.4)),
++                RayFrame3.fromDirectionAndXAxis(k,new Vec3(.2,1,.1)),LAMBDA,"source",
++                JonesVector.linearRadians(.7).times(ComplexAmplitude.fromPhaseRadians(.3)));
++        var plane=new OpticalPlane3(center,normal);
++        var originalResult=new PlanarFresnelInterface(plane,1,1.45).scatter(original);
++        var f=original.frame();
++        var rotated=new GeometricJonesRay(rotate90(original.referencePointMeters()),
++                new RayFrame3(rotate90(f.direction()),rotate90(f.xAxis()),rotate90(f.yAxis())),
++                LAMBDA,"source",original.amplitudeSqrtWatts());
++        var newResult=new PlanarFresnelInterface(new OpticalPlane3(rotate90(center),rotate90(normal)),
++                1,1.45).scatter(rotated);
++        var before=originalResult.reflected().laboratoryAmplitudeSqrtWatts();
++        var after=newResult.reflected().laboratoryAmplitudeSqrtWatts();
++        sameComplex(after.x(),before.y().scale(-1));
++        sameComplex(after.y(),before.x());
++        sameComplex(after.z(),before.z());
++        near(originalResult.outputPowerWatts(),newResult.outputPowerWatts());
++        near(originalResult.reflected().frame().direction().dot(normal),
++                newResult.reflected().frame().direction().dot(rotate90(normal)));
++    }
++    @Test void reversedOrGrazingIncidenceIsNotSilentlyAccepted() {
++        var iface=new PlanarFresnelInterface(PLANE,1,1.5);
++        var backwards=new GeometricJonesRay(new Vec3(0,0,1),
++                RayFrame3.fromDirectionAndXAxis(new Vec3(0,0,-1),Y),LAMBDA,"a",
++                JonesVector.horizontal());
++        assertThrows(IllegalArgumentException.class,()->iface.scatter(backwards));
++        var grazing=new GeometricJonesRay(new Vec3(0,0,0),
++                RayFrame3.fromDirectionAndXAxis(X,Y),LAMBDA,"a",JonesVector.horizontal());
++        assertThrows(IllegalArgumentException.class,()->iface.scatter(grazing));
++    }
++    @Test void surfaceBehindRayAndInvalidIndexFailClosed() {
++        var reversePlane=new OpticalPlane3(new Vec3(0,0,-2),Z);
++        assertThrows(IllegalArgumentException.class,()->new PlanarFresnelInterface(reversePlane,1,0));
++        assertThrows(IllegalArgumentException.class,()->new PlanarFresnelInterface(reversePlane,1,1.5)
++                .scatter(ray(0,JonesVector.horizontal())));
++    }
++    @Test void normalIncidenceBasisDoesNotDependOnArbitraryGlobalXAxis() {
++        var incoming=new GeometricJonesRay(new Vec3(0,0,0),
++                RayFrame3.fromDirectionAndXAxis(Z,Y),LAMBDA,"coherent",JonesVector.horizontal());
++        var response=new PlanarFresnelInterface(PLANE,1,1.5).scatter(incoming);
++        near(response.reflected().powerWatts(),0.04);
++        near(response.reflected().laboratoryAmplitudeSqrtWatts().y().real(),-0.2);
++    }
++}
+--- a/physics-core/src/test/java/dev/coldatomcraft/physics/optics/RayFrame3Test.java
++++ b/physics-core/src/test/java/dev/coldatomcraft/physics/optics/RayFrame3Test.java
+@@ -0,0 +1,64 @@
++package dev.coldatomcraft.physics.optics;
++
++import dev.coldatomcraft.physics.Vec3;
++import org.junit.jupiter.api.Test;
++import static org.junit.jupiter.api.Assertions.*;
++
++class RayFrame3Test {
++    private static final Vec3 X=new Vec3(1,0,0), Y=new Vec3(0,1,0), Z=new Vec3(0,0,1);
++
++    @Test void rightHandedOrthonormalBasis() {
++        var frame=RayFrame3.fromDirectionAndXAxis(Z,X);
++        assertEquals(Z,frame.direction());
++        assertEquals(X,frame.xAxis());
++        assertEquals(Y,frame.yAxis());
++        assertEquals(frame.direction(),frame.xAxis().cross(frame.yAxis()));
++    }
++    @Test void nonunitInputVectorsAreNormalized() {
++        var frame=RayFrame3.fromDirectionAndXAxis(new Vec3(0,0,8),new Vec3(4,0,2));
++        assertEquals(1.0,frame.xAxis().magnitude(),1e-12);
++        assertEquals(0.0,frame.xAxis().dot(frame.direction()),1e-12);
++    }
++    @Test void invalidFramesCannotEnterCalculation() {
++        assertThrows(IllegalArgumentException.class,()->RayFrame3.fromDirectionAndXAxis(Z,Z));
++        assertThrows(IllegalArgumentException.class,()->new RayFrame3(Z,X,new Vec3(0,-1,0)));
++        assertThrows(IllegalArgumentException.class,()->new RayFrame3(Z,X,X));
++        assertThrows(IllegalArgumentException.class,()->RayFrame3.fromDirectionAndXAxis(new Vec3(0,0,0),X));
++    }
++    @Test void planeWavePathKeepsComplexPowerAndPhase() {
++        var in=new GeometricJonesRay(new Vec3(0,0,0),RayFrame3.fromDirectionAndXAxis(Z,X),
++                800e-9,"same-laser",JonesVector.horizontal().scale(Math.sqrt(0.012)));
++        var out=in.advance(200e-9,1);
++        assertEquals(0.012,out.powerWatts(),1e-15);
++        assertEquals(0.0,out.amplitudeSqrtWatts().x().real(),1e-14);
++        assertEquals(Math.sqrt(0.012),out.amplitudeSqrtWatts().x().imaginary(),1e-14);
++        assertEquals(200e-9,out.referencePointMeters().z(),1e-18);
++    }
++    @Test void normalBasisRotationPreservesLabFieldAndPower() {
++        var left=RayFrame3.fromDirectionAndXAxis(Z,X);
++        var right=RayFrame3.fromDirectionAndXAxis(Z,Y);
++        var a=new GeometricJonesRay(new Vec3(0,0,0),left,780e-9,"laser",
++                JonesVector.horizontal());
++        var b=new GeometricJonesRay(new Vec3(0,0,0),right,780e-9,"laser",
++                JonesVector.vertical().scale(-1));
++        assertEquals(a.laboratoryAmplitudeSqrtWatts(),b.laboratoryAmplitudeSqrtWatts());
++        assertEquals(1.0,a.laboratoryAmplitudeSqrtWatts().squaredNormWatts(),1e-14);
++    }
++    @Test void microscopicDisplacementCannotSilentlyDisappearAtHugeCoordinates() {
++        var ray=new GeometricJonesRay(new Vec3(0,0,1e12),
++                RayFrame3.fromDirectionAndXAxis(Z,X),780e-9,"laser",JonesVector.horizontal());
++        assertThrows(IllegalArgumentException.class,()->ray.advance(100e-9,1));
++        assertEquals(1e12 + .125,ray.advance(.125,1).referencePointMeters().z(),.001);
++    }
++    @Test void noImplicitGaussianPropagation() {
++        var mode=ParaxialModeField.fromPlane("laser","local",new GaussianPlane(
++                0.01,780e-9,new GaussianQ(0,0.75)),JonesVector.horizontal(),0);
++        var geo=GeometricJonesRay.atGaussianReferencePlane(mode,new Vec3(0,0,0),
++                RayFrame3.fromDirectionAndXAxis(Z,X));
++        assertEquals(mode.powerWatts(),geo.powerWatts(),1e-15);
++        assertEquals(mode.phaseReferenceKey(),geo.phaseReferenceKey());
++        assertEquals(mode.modalAmplitudeSqrtWatts(),geo.amplitudeSqrtWatts());
++        assertThrows(IllegalArgumentException.class,()->geo.advance(-1,1));
++        assertThrows(IllegalArgumentException.class,()->geo.advance(1,-1));
++    }
++}
+--- a/tools/verify_m0.py
++++ b/tools/verify_m0.py
+@@ -23,7 +23,7 @@
+ 
+ from inspect_mod_jar import inspect
+ 
+-MINIMUM_JUNIT_TEST_COUNT = 224  # D6 baseline 194 + D7 30 @Test methods
++MINIMUM_JUNIT_TEST_COUNT = 255  # D7 baseline 224 + D8 31 @Test methods
+ GRADLE_TASKS = (
+     "clean", ":physics-core:test", ":experiment-core:test",
+     ":neoforge-mod:build", ":neoforge-mod:verifyDistributableJar",
+@@ -98,7 +98,7 @@
+         source_root=str(root),
+         timestamp_utc=stamp,
+         os=platform.platform(),
+-        scope="M0-D7 source build/JUnit/JAR content only; NOT game startup or Owner signoff",
++        scope="M0-D8 source build/JUnit/JAR content only; NOT game startup or Owner signoff",
+         checks={},
+         actual_installed_jar_runtime="NOT RUN",
+         minecraft_client_runtime="NOT RUN",
+@@ -148,6 +148,7 @@
+             ("optics-high-precision-oracle", [sys.executable, "verification/M0-R2.1-D5/verify_optics_reference.py"]),
+             ("coherent-high-precision-oracle", [sys.executable, "verification/M0-R2.1-D6/verify_coherent_reference.py"]),
+             ("optical-path-high-precision-oracle", [sys.executable, "verification/M0-R2.1-D7/verify_optical_path_reference.py"]),
++            ("fresnel-high-precision-oracle", [sys.executable, "verification/M0-R2.1-D8/verify_fresnel_reference.py"]),
+             ("python-tests", [sys.executable, "-m", "unittest", "discover",
+                               "-s", "verification", "-p", "test_*.py", "-v"]),
+             ("asset-schema", [sys.executable, "tools/validate_assets.py",
+--- a/verification/GeometryOpticsSmoke.java
++++ b/verification/GeometryOpticsSmoke.java
+@@ -0,0 +1,62 @@
++package dev.coldatomcraft.verification;
++
++import dev.coldatomcraft.physics.Vec3;
++import dev.coldatomcraft.physics.optics.*;
++
++/** Pure Java D8 geometry/Fresnel/mirror checks; not official JUnit. */
++public final class GeometryOpticsSmoke {
++    private static int checks;
++    private static void check(boolean value,String reason) {
++        checks++;
++        if (!value) throw new AssertionError(reason);
++    }
++    private static void near(double a,double b,double abs,String reason) {
++        check(Math.abs(a-b)<=abs,reason+": "+a+" vs "+b);
++    }
++    private static final Vec3 ORIGIN=new Vec3(0,0,0);
++    private static final Vec3 Z=new Vec3(0,0,1);
++    private static final Vec3 Y=new Vec3(0,1,0);
++    private static GeometricJonesRay ray(double angle, JonesVector polarization) {
++        var k=new Vec3(Math.sin(angle),0,Math.cos(angle));
++        return new GeometricJonesRay(new Vec3(0,0,-1),
++                RayFrame3.fromDirectionAndXAxis(k,Y),780e-9,"laser",polarization);
++    }
++    public static void main(String[] args) {
++        var surface=new OpticalPlane3(ORIGIN,Z);
++        var fs=new PlanarFresnelInterface(surface,1,1.5).scatter(ray(0,JonesVector.horizontal()));
++        near(fs.coefficients().rS().real(),-.2,1e-12,"normal r_s");
++        near(fs.coefficients().rP().real(),.2,1e-12,"normal r_p sign");
++        near(fs.coefficients().transmittanceS(),.96,1e-12,"normal T_s");
++        near(fs.reflected().powerWatts(),.04,1e-12,"normal R");
++        near(fs.transmitted().orElseThrow().powerWatts(),.96,1e-12,"normal T");
++        near(fs.outputPowerWatts(),1,1e-12,"power conservation normal");
++        var bp=new PlanarFresnelInterface(surface,1,1.5).scatter(
++                ray(Math.atan(1.5),JonesVector.vertical()));
++        near(bp.reflected().powerWatts(),0,1e-26,"Brewster p zero");
++        near(bp.outputPowerWatts(),1,1e-12,"Brewster total power");
++        var tir=new PlanarFresnelInterface(surface,1.5,1).scatter(
++                ray(Math.toRadians(60),JonesVector.linearRadians(.3)));
++        check(tir.transmitted().isEmpty(),"TIR no power ray");
++        check(tir.coefficients().totalInternalReflection(),"TIR flagged");
++        near(tir.reflected().powerWatts(),1,1e-12,"TIR all power reflected");
++        check(tir.coefficients().rS().imaginary()!=0,"TIR complex phase");
++        var fold=new IdealCalibratedPlaneMirror(new OpticalPlane3(ORIGIN,new Vec3(-1,0,1)),0,0)
++                .reflect(ray(0,JonesVector.horizontal()));
++        near(fold.reflected().frame().direction().x(),1,1e-12,"90 degree fold");
++        near(fold.reflected().powerWatts(),1,1e-12,"ideal mirror power");
++        var mode=ParaxialModeField.fromPlane("laser","in",new GaussianPlane(.02,780e-9,
++                new GaussianQ(.3,1.2)),JonesVector.horizontal(),.2);
++        var modeRay=GeometricJonesRay.atGaussianReferencePlane(mode,ORIGIN,
++                RayFrame3.fromDirectionAndXAxis(Z,Y));
++        var mirror=new IdealCalibratedPlaneMirror(surface,0,0);
++        var reflectedMode=mirror.reflectGaussianModeAtPlane(mode,modeRay,"out");
++        near(reflectedMode.q().realMeters(),.3,1e-12,"mirror Gaussian q curvature");
++        near(reflectedMode.q().imaginaryMeters(),1.2,1e-12,"mirror Gaussian q rayleigh");
++        near(reflectedMode.powerWatts(),.02,1e-12,"mirror Gaussian power");
++        boolean bad=false;
++        try {new PlanarFresnelInterface(surface,1,1.5).scatter(ray(0,JonesVector.horizontal())
++                 .advance(-1,1));} catch(IllegalArgumentException ex){bad=true;}
++        check(bad,"negative travel rejected");
++        System.out.println("PASS: "+checks+" D8 geometry/Fresnel/mirror smoke checks (NOT JUnit)");
++    }
++}

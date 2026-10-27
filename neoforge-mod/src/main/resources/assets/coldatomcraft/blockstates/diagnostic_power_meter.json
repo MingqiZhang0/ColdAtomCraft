@@ -1,0 +1,64 @@
+{
+  "variants": {
+    "aperture=0,facing=south": {
+      "model": "coldatomcraft:block/diagnostic_power_meter_0",
+      "y": 0,
+      "uvlock": true
+    },
+    "aperture=0,facing=east": {
+      "model": "coldatomcraft:block/diagnostic_power_meter_0",
+      "y": 270,
+      "uvlock": true
+    },
+    "aperture=0,facing=north": {
+      "model": "coldatomcraft:block/diagnostic_power_meter_0",
+      "y": 180,
+      "uvlock": true
+    },
+    "aperture=0,facing=west": {
+      "model": "coldatomcraft:block/diagnostic_power_meter_0",
+      "y": 90,
+      "uvlock": true
+    },
+    "aperture=1,facing=south": {
+      "model": "coldatomcraft:block/diagnostic_power_meter_1",
+      "y": 0,
+      "uvlock": true
+    },
+    "aperture=1,facing=east": {
+      "model": "coldatomcraft:block/diagnostic_power_meter_1",
+      "y": 270,
+      "uvlock": true
+    },
+    "aperture=1,facing=north": {
+      "model": "coldatomcraft:block/diagnostic_power_meter_1",
+      "y": 180,
+      "uvlock": true
+    },
+    "aperture=1,facing=west": {
+      "model": "coldatomcraft:block/diagnostic_power_meter_1",
+      "y": 90,
+      "uvlock": true
+    },
+    "aperture=2,facing=south": {
+      "model": "coldatomcraft:block/diagnostic_power_meter_2",
+      "y": 0,
+      "uvlock": true
+    },
+    "aperture=2,facing=east": {
+      "model": "coldatomcraft:block/diagnostic_power_meter_2",
+      "y": 270,
+      "uvlock": true
+    },
+    "aperture=2,facing=north": {
+      "model": "coldatomcraft:block/diagnostic_power_meter_2",
+      "y": 180,
+      "uvlock": true
+    },
+    "aperture=2,facing=west": {
+      "model": "coldatomcraft:block/diagnostic_power_meter_2",
+      "y": 90,
+      "uvlock": true
+    }
+  }
+}

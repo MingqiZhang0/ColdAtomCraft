@@ -1,0 +1,1006 @@
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -63,11 +63,29 @@
+           done
+           unzip -p "$jar_file" META-INF/neoforge.mods.toml
+ 
++      - name: Check all compiled classes and actual JUnit XML
++        run: |
++          set -euo pipefail
++          jar_file="$(find neoforge-mod/build/libs -maxdepth 1 -type f -name 'coldatomcraft-*.jar' | head -n 1)"
++          test -n "$jar_file"
++          python tools/inspect_mod_jar.py --jar "$jar_file" --root .
++          python - <<'PYTHON'
++          from pathlib import Path
++          import sys
++          sys.path.insert(0, 'tools')
++          from verify_m0 import junit_evidence, MINIMUM_JUNIT_TEST_COUNT
++          counts = junit_evidence(Path('.'))
++          print('Actual JUnit XML:', counts)
++          assert counts['tests'] >= MINIMUM_JUNIT_TEST_COUNT
++          assert counts['failures'] == counts['errors'] == counts['skipped'] == 0
++          assert counts['files'] >= 2
++          PYTHON
++
+       - name: Upload JUnit reports
+         if: always()
+         uses: actions/upload-artifact@v4
+         with:
+-          name: CAC-M0-R2-junit-reports
++          name: CAC-M0-R2.1-D4-junit-reports
+           path: |
+             physics-core/build/test-results/test/*.xml
+             experiment-core/build/test-results/test/*.xml
+@@ -77,6 +95,6 @@
+       - name: Upload NeoForge JAR
+         uses: actions/upload-artifact@v4
+         with:
+-          name: CAC-M0-R2-neoforge
++          name: CAC-M0-R2.1-D4-neoforge
+           path: neoforge-mod/build/libs/*.jar
+           retention-days: 14
+--- a/.gitignore
++++ b/.gitignore
+@@ -17,3 +17,8 @@
+ # Python helper caches
+ __pycache__/
+ *.pyc
++
++# D4 local evidence: curate the included audit logs, but never commit personal
++# runtime captures or independently created Minecraft worlds.
++!verification/M0-R2.1-D4/logs/*.log
++verification/local-jdk25/
+--- a/README.md
++++ b/README.md
+@@ -1,3 +1,32 @@
++# Cold Atom Craft — M0-R2.1-D4 verification + ledger hot-path checkpoint
++
++**Not a NeoForge release. M0 remains OPEN. No physical laser or Blender asset is implemented.**
++
++D4 makes a narrow, tested pure-Java performance correction: a claim monotonic
++per-run history index replaces the old all-settlement scan during stale-run
++abandonment. Even an APPLIED, FAILED or pending CLAIMED event still forbids
++abandonment. Four new JUnit-source regressions test these invariants. This does
++not provide disk persistence or cross-restart delivery guarantees.
++
++D4 also adds two independently testable release-validation tools:
++
++- `tools/verify_m0.py`: opt-in local JDK 25 Gradle/JUnit/JAR **content** evidence
++  runner. It does not launch Minecraft or accept the EULA. It exits BLOCKED
++  if JDK25 is unavailable; see `docs/RUN_ON_WINDOWS.md`.
++- `tools/inspect_mod_jar.py`: validates metadata, classfile major 69, forbidden
++  probes and **every actual compiled `.class` in all three source modules**
++  against the packaged JAR; does not prove the JAR loads in-game.
++
++**Verified here (JDK21/offline):** 153/153 assertion-runner methods (NOT
++JUnit), 383/383 existing Java smoke checks, 28/28 Python unit tests, and a
++D3-vs-D4 observational benchmark. **JDK25 / Gradle / new NeoForge JAR: NOT
++RUN/BLOCKED** on this host, which has JDK21 and cannot reach the repositories.
++D3/R2 old game-launch logs are historical, NOT D4 runtime evidence.
++
++See [D4 audit](docs/M0_R2_1_D4_AUDIT.md) and [D4 evidence](verification/M0-R2.1-D4/README.md).
++
++---
++
+ # CAC-M0-R2.1-D3 — director engineering checkpoint (2026-10-26)
+ 
+ **Status: pure-Java engineering checkpoint, NOT a NeoForge release; M0 remains open.**
+--- a/docs/ARCHITECTURE.md
++++ b/docs/ARCHITECTURE.md
+@@ -1,3 +1,11 @@
++## D4 performance and validation split
++
++The Ledger stores a monotonic per-run claim marker solely to avoid repeatedly
++scanning all event settlements when a run is abandoned. The release verifier
++performs JDK25 Gradle/JUnit plus compiled-class/JAR consistency checks only;
++it does not replace a real NeoForge client/server load test. Formal runtime
++integration, server authority and crash recovery are still unimplemented.
++
+ # D3 architecture change — in-memory apparatus lease gate
+ 
+ `ExperimentRunScheduler.createExperiment(ExperimentReservation)` atomically records
+--- a/docs/CHANGELOG.md
++++ b/docs/CHANGELOG.md
+@@ -1,4 +1,14 @@
+ # Changelog
++
++## M0-R2.1-D4 · 2026-10-26 · Director ledger index + JDK25 evidence tooling
++
++- Replaced abandoned-run history's O(total settlements) scan with an O(1) monotonic per-run claims index, while conserving CLAIMED / APPLIED / FAILED retry prohibition.
++- Added four JUnit-source regression cases for mixed terminal outcomes, unrelated runs, rejected claims and duplicate submissions.
++- Added an independent JAR verifier, including comprehensive compiled class inventory and Java 25 classfile checks, with eleven synthetic Python tests.
++- Added opt-in local JDK25 Gradle/JUnit/JAR evidence runner; observed clean **BLOCKED** status with JDK21. Does not claim actual NeoForge execution.
++- Compared D3 vs D4 abandonment hot-path latency under one JDK21 host; microbenchmark only (NOT game TPS).
++- No new science formulas, equipment, in-game mutation, EULA edits, or production model approvals.
++
+ 
+ ## M0-R2.1-D3 · 2026-10-26 · Director in-memory scheduling contract checkpoint
+ 
+--- a/docs/DECISIONS.md
++++ b/docs/DECISIONS.md
+@@ -94,3 +94,19 @@
+ - Authority: code-director interface refinement, **not** Owner approval of any physical model, physical constants, world-effect damage law or final M0 closure.
+ - Unresolved: future scheduler must enforce logical-experiment exclusivity across different run IDs and decide a durable recovery strategy before enabling real world modification.
+ - Status: implemented and offline-tested in D1; JDK 25/NeoForge integration pending.
++
++## CAC-012 - 2026-10-26 - D4 claim-history index and release evidence boundary
++
++- Engineering decision: after the first successful Claim, a run remains permanently
++  marked as having settlement history for the lifetime of the in-memory Ledger;
++  the terminal state cannot clear this flag. Abandonment must be O(1) in the
++  total number of previously claimed events. The claim index is additive to,
++  not a replacement for, the actual settlement ledger or tombstones.
++- Engineering decision: a build is only certified after formal JDK25 Gradle and
++  JUnit execution plus class-by-class JAR inventory verification. The portable
++  validator may run under other JDKs, but D4's local JDK21 tests are NOT formal
++  JDK25 evidence.
++- Risk: a JAR content check does not demonstrate client/server runtime loading;
++  no release or Owner M0 closure is authorized by these checks.
++- No physics-model approval, atom/laser damage law, Blender model or server
++  world-effect authority granted by this decision.
+--- a/docs/M0_R2_1_D4_AUDIT.md
++++ b/docs/M0_R2_1_D4_AUDIT.md
+@@ -0,0 +1,114 @@
++# Cold Atom Craft — M0-R2.1-D4 Code Director Audit
++
++**Date:** 2026-10-26  
++**Input:** `ColdAtomCraft-M0-R2.1-D3-DirectorCheckpoint.zip`  
++**Scope:** in-memory stale-run settlement lookup + reproducible release content tests.  
++**State:** **ENGINEERING CHECKPOINT, M0 STILL OPEN**.
++
++## 1. Evidence and frozen baseline
++
++- Extracted the official D3 checkpoint in an independent directory, not in place.
++- Verified **198/198** frozen D3 SHA-256 manifest members before edits.
++- Executed D3 offline regression tests from the original source before making changes: **149/149** method sweep PASS, 17 Python asset PASS. Not formal JUnit.
++- Maintained a separate `ColdAtomCraft-M0-R2.1-D4` tree; D3 remains frozen.
++
++## 2. Actual code change: stale-run abandonment claim-history index
++
++Previously `WorldEffectLedger.abandonRun` scanned **all** entries in
++`settlements`, regardless of the run. After many legitimate physics events,
++repeatedly abandoning stale but still unclaimed independent runs could perform
++unbounded cumulative historic scans. D4 adds a monotonic `runsWithClaims` set,
++updated inside the existing synchronized claim transition along with
++`claimedSlots` and `settlements`. `abandonRun` now checks that set once.
++
++**Safety invariants preserved:**
++
++1. A run is in `runsWithClaims` only after a successful `CLAIMED` transition.
++2. The marker is never removed by `markApplied`, `markFailed` or duplicate calls.
++3. CLAIMED, APPLIED and FAILED events all prohibit run abandonment.
++4. A rejected candidate cannot poison the run; unclaimed stale runs can still retire.
++5. Synchronization of claim and abandon remains atomic for this one Ledger.
++6. No change to event identity, source/target snapshots, Owner model authority,
++   server/world adapter or scientific formulas.
++
++**Performance:** previously abandoned-run lookup was `O(number of settlements)`;
++a hash-set membership check now has `O(1)` expected cost, at the expense of one
++additional monotonic index entry per run that has ever claimed an event. This
++is **not** a memory-reclamation design. All existing settlement records and
++tombstones remain retained; cross-restart exactly-once is still absent.
++
++## 3. Same-environment performance comparison
++
++JDK 21 in the current Linux runtime; 16,000 successful synthetic claims in one
++run, followed by 4,000 registered-and-abandoned independent zero-claim runs.
++Three separate JVM processes were used for D3 and D4. Results in
++`verification/M0-R2.1-D4/logs/claim-history-d3-vs-d4.log`.
++
++| Baseline | Samples (ms) | Median (ms) |
++| --- | --- | ---: |
++| frozen D3 | 392.362 / 439.052 / 431.817 | 431.817 |
++| D4 | 14.100 / 9.332 / 10.951 | 10.951 |
++
++These are observational microbenchmark timings, **not** TPS or a guarantee of
++identical speedup under the actual Minecraft server/JDK25. The benchmark uses
++synthetic test-only physics fixtures.
++
++## 4. Distribution integrity and independent evidence collection
++
++- Added `tools/inspect_mod_jar.py` to validate the NeoForge metadata, Java25
++  classfile major 69, forbidden test/probe classes, and **every** compiled class
++  in `physics-core`, `experiment-core` and `neoforge-mod` against the ZIP/JAR
++  entries. No more reliance on an outdated short list alone.
++- Tightened `verifyDistributableJar` in `neoforge-mod/build.gradle` to cover
++  the newly introduced D2/D3 scheduling and server fact classes.
++- Added `tools/verify_m0.py`, an explicit JDK25 preflight + full Gradle/JUnit
++  XML + release JAR inspection runner. It records machine-readable PASS, FAIL,
++  BLOCKED and NOT RUN evidence. It never runs Minecraft or accepts the EULA.
++- Updated the GitHub Actions CI configuration to require actual JUnit XML and
++  the new class-by-class JAR inspection, if/when a repository with CI exists.
++- Added 7 synthetic JAR inspector tests and 4 JUnit XML evidence-parser tests.
++  A historic R2 JAR is correctly rejected as a D4 candidate because new
++  scheduler classes do not exist in it. This is an **expected negative test**,
++  not a failure of the previously archived R2 build.
++
++## 5. Executed verification and strict limitations
++
++| Verification | Status | Evidence |
++| --- | --- | --- |
++| D3 manifest | PASS 198/198 | initial input rehash |
++| Original D3 suite | PASS (149/149 non-JUnit, 17 asset) | D4 `d3-baseline-offline.log` |
++| D4 pure-Java smoke | PASS 383/383 under JDK21 | `logs/d4-final-offline.log` |
++| D4 JUnit-source method sweep | PASS 153/153 via offline shim; **NOT JUNIT** | `logs/d4-final-offline.log` |
++| D4 Python unit tests | PASS 28/28 | `logs/python-final.log` |
++| D3 vs D4 performance | OBSERVATIONAL | `logs/claim-history-d3-vs-d4.log` |
++| JDK25 preflight in current runtime | BLOCKED (javac 21) | `local-preflight/report.json` |
++| D4 actual Gradle JUnit engine | NOT RUN | Requires JDK25 and reachable dependencies |
++| D4 actual NeoForge build | NOT RUN | Same missing prerequisites |
++| D4 distributable JAR runtime | NOT RUN | No D4 JAR has been produced |
++| D4 installed client/dedicated server startup | NOT RUN | Separate runtime validation required |
++| Live server scheduler/tick/world adapter | NOT IMPLEMENTED | Pure Java contracts only |
++| Actual Owner Blender asset and OPT-001 world propagation | NOT IMPLEMENTED | Owner-model / asset handoff not present |
++
++The only Java test execution in this environment uses JDK21 and an independent
++assertion shim; it is **not** a replacement for the full Java25 JUnit5 engine.
++Historic M0-R2 JDK25/NeoForge and server logs still establish only the old R2
++commit, not any R2.1-D1/D2/D3/D4 source state.
++
++## 6. Remaining high-priority gates
++
++1. Run `python tools/verify_m0.py` on the D4 source with real JDK25 +
++   Gradle/NeoForge dependency access; retain the `report.json`, original JUnit
++   XML, build log, and D4 JAR. The script's PASS status covers only these checks.
++2. Independently install and run **that exact D4 JAR** in the matching Minecraft
++   26.3 + NeoForge 26.3.0.99 environment, including a client and dedicated server
++   (observe EULA and Owner authority; do not edit EULA on the owner's behalf).
++3. Implement one actual authoritative `ServerLevel` scheduling domain and
++   server-owned device identity/time/world snapshot capture. Current pure Java
++   records cannot authenticate their input. All actual world effects remain
++   disabled until a safe server mutation and recovery policy is defined.
++4. Owner retains physics model and Blender asset decisions. No actual Gaussian
++   optics or cold-atom equations have been implemented in D4.
++
++**Director disposition:** narrow D4 pure Java correction PASS under its stated
++local test limits; **M0 overall OPEN**; D4 official JDK25/NeoForge Gate remains
++BLOCKED/NOT RUN, and production world effects remain forbidden.
+--- a/docs/PERFORMANCE_AUDIT.md
++++ b/docs/PERFORMANCE_AUDIT.md
+@@ -1,3 +1,29 @@
++# D4 Claim-History Abandonment Microbenchmark
++
++The D3 implementation called `abandonRun()` by scanning all settlement event
++keys (`O(total previous events)` worst case for each fresh unclaimed run). D4
++maintains `runsWithClaims` under the same synchronized ledger monitor and
++checks only this monotonic index (`O(1)` expected hash lookup). It never clears
++the flag for APPLIED or FAILED outcomes. Per-claim bookkeeping adds a hash-set
++insert, with no extra game world work.
++
++Same-host JDK 21, independent process repetitions, 16,000 claims in one run,
++then 4,000 different no-claim runs registered and abandoned:
++
++| Baseline | Run 1 | Run 2 | Run 3 | Median |
++| --- | --- | --- | --- | --- |
++| D3 scan | 392.362 ms | 439.052 ms | 431.817 ms | 431.817 ms |
++| D4 index | 14.100 ms | 9.332 ms | 10.951 ms | 10.951 ms |
++
++**Interpretation:** directional reduction for this exact synthetic workload,
++not a performance SLA, not an authoritative JDK25 number, and NOT Minecraft TPS.
++The tests retain all claim and settlement records in memory; growth and
++crash/restart semantics are **unchanged**. The original measurements can be
++rerun using `verification/M0-R2.1-D4/run_claim_benchmark.sh` with the D3
++source directory beside D4. No production laser is benchmarked.
++
++---
++
+ # D3 resource-reservation performance addendum (2026-10-26)
+ 
+ `ExperimentRunScheduler.createExperiment(ExperimentReservation)` now performs a
+--- a/docs/RUN_ON_WINDOWS.md
++++ b/docs/RUN_ON_WINDOWS.md
+@@ -1,3 +1,29 @@
++# D4 recommended: reproducible JDK 25 evidence capture
++
++Open PowerShell in the **D4** project root, with Java 25 JDK and Python 3.11+
++installed, then execute:
++
++```powershell
++python .\tools\verify_m0.py
++```
++
++This opt-in script runs actual standalone Java25 smoke, Python unit tests, asset
++spec validation, Gradle 9.2.1 full clean build, actual JUnit XML audit and
++class-by-class distributable JAR inspection. Evidence is written under
++`verification/local-jdk25/<UTC timestamp>/report.json` with logs. If the JDK
++is not 25, it exits with code **2 / BLOCKED**, not a false PASS. Failed builds
++exit with code **1 / FAIL**. Code 0 means ONLY that build, unit tests and JAR
++contents passed; it does **not** mean Minecraft client, server or independent
++installed-JAR runtime was exercised.
++
++The script never changes `eula.txt`, installs a JAR, opens Minecraft, modifies
++worlds, publishes files or changes the user's Java/Gradle installation. The
++independent installed-JAR server/client verification remains a separate manual
++Gate after the script passes. Keep the report and the actual JAR for director
++review. It will not retroactively validate historical R2 or D3 artifacts.
++
++---
++
+ # D3 Windows build/review gate (not yet executed for D3)
+ 
+ The current D3 source was checked offline with Linux JDK21; to **actually** validate
+@@ -36,7 +62,7 @@
+ 
+ - Install a Java 25 **JDK** (validated with Eclipse Temurin `25.0.3+9-LTS`), not only a JRE.
+ - Gradle does **not** need to be installed globally: the official `9.2.1` wrapper is checked in.
+-- Optional for asset metadata checks: Python 3.10+ (validated with Python 3.14.2).
++- For D4 automated certification: Python 3.11+ (`tomllib` is used); optional for older asset checks: Python 3.10+ (validated with Python 3.14.2).
+ - Optional: IntelliJ IDEA with the Gradle JDK set to JDK 25.
+ 
+ In a new PowerShell terminal in the project root:
+--- a/docs/TEST_PLAN.md
++++ b/docs/TEST_PLAN.md
+@@ -1,3 +1,23 @@
++# D4 current verification (2026-10-26)
++
++| Gate | Current D4 result | Scope |
++| --- | --- | --- |
++| Frozen D3 archive integrity | PASS 198/198 | SHA-256 against signed-off D3 source manifest |
++| D4 Java smoke under JDK21 | PASS 383/383 | NOT JDK25 |
++| D4 JUnit-source methods under assertion shim | PASS 153/153 | NOT formal JUnit engine |
++| D4 Python tests (including new JAR inspector cases) | PASS 28/28 | 17 asset + 7 inspector + 4 evidence parser |
++| D3 vs D4 claim-history microbenchmark | OBSERVATIONAL | Same-host JDK21; see D4 evidence, NOT TPS |
++| D4 JDK25 Gradle/JUnit | BLOCKED / NOT RUN | Local JDK21; no Gradle/Maven access |
++| D4 official NeoForge JAR | NOT RUN | Cannot build in current environment |
++| D4 independent installed-JAR / game runtime | NOT RUN | No D4 JAR exists yet |
++| Live server adapter / atomic world effects | NOT IMPLEMENTED | Must precede real laser world effects |
++
++`tools/verify_m0.py` is provided as a user-initiated formal JDK25 evidence
++runner on a compatible machine. A script being present is not evidence it
++completed these gates. Prior R2 installed/run evidence does not apply to D4.
++
++---
++
+ # D3 validation status — 2026-10-26
+ 
+ | Check | Result |
+--- a/docs/WORLD_INTERACTION_CONTRACT.md
++++ b/docs/WORLD_INTERACTION_CONTRACT.md
+@@ -1,3 +1,12 @@
++## D4 note — monotonic run claim history
++
++`WorldEffectLedger` now indexes the fact that a calculation run has *ever*
++claimed an event. It is set at the same synchronized moment as the event's
++CLAIMED record and remains true after APPLIED or FAILED. The abandoned-run
++check no longer scans every historical event. This changes performance, **not**
++the permission to retry, or the lack of production `ServerLevel` and
++cross-restart exactly-once guarantees.
++
+ # D3 addendum — apparatus reservation and two clocks (2026-10-26)
+ 
+ **Implemented in the pure Java scheduler:** session creation requires `ExperimentReservation`,
+--- a/experiment-core/src/main/java/dev/coldatomcraft/experiment/world/WorldEffectLedger.java
++++ b/experiment-core/src/main/java/dev/coldatomcraft/experiment/world/WorldEffectLedger.java
+@@ -84,6 +84,10 @@
+ 
+     private final Map<StepKey, SimulationInterval> calculations = new HashMap<>();
+     private final Set<String> abandonedRuns = new HashSet<>();
++    // Monotonic claim history per run; every terminal state still counts as claimed.
++    // Maintained under the same monitor as settlements, so abandon is O(1)
++    // rather than rescanning all prior claims on every stale-run retry.
++    private final Set<String> runsWithClaims = new HashSet<>();
+     private final Map<String, NavigableMap<Long, SimulationInterval>> intervalsByRun = new HashMap<>();
+     // Event identity is unique per (run, step, eventIndex), regardless of model
+     // or model revision. TransferEventKey deliberately carries model provenance,
+@@ -176,6 +180,7 @@
+         }
+         claimedSlots.put(slot, candidate.eventKey());
+         settlements.put(candidate.eventKey(), SettlementState.CLAIMED);
++        runsWithClaims.add(candidate.step().calculationRunId());
+         return ClaimResult.CLAIMED;
+     }
+ 
+@@ -208,14 +213,11 @@
+         if (!intervalsByRun.containsKey(calculationRunId)) {
+             return AbandonResult.UNKNOWN_RUN;
+         }
+-        // This is intentionally conservative: a FAILED claim might have partially
+-        // mutated the world, and an APPLIED one certainly could have. The scan is
+-        // O(number of event claims), but abandonment is an exceptional path, not
+-        // part of per-tick or per-event hot-path processing.
+-        for (TransferEventKey key : settlements.keySet()) {
+-            if (calculationRunId.equals(key.calculationRunId())) {
+-                return AbandonResult.HAS_SETTLEMENT_CLAIMS;
+-            }
++        // A FAILED claim might have partially mutated the world; an APPLIED
++        // claim might already have been observed. Neither may be abandoned.
++        // Claim history is monotonic and indexed by run ID under this lock.
++        if (runsWithClaims.contains(calculationRunId)) {
++            return AbandonResult.HAS_SETTLEMENT_CLAIMS;
+         }
+         abandonedRuns.add(calculationRunId);
+         return AbandonResult.ABANDONED;
+--- a/experiment-core/src/test/java/dev/coldatomcraft/experiment/world/WorldEffectLedgerClaimIndexTest.java
++++ b/experiment-core/src/test/java/dev/coldatomcraft/experiment/world/WorldEffectLedgerClaimIndexTest.java
+@@ -0,0 +1,101 @@
++package dev.coldatomcraft.experiment.world;
++
++import org.junit.jupiter.api.Test;
++
++import static dev.coldatomcraft.experiment.world.ContractTestSupport.candidate;
++import static dev.coldatomcraft.experiment.world.ContractTestSupport.precheck;
++import static org.junit.jupiter.api.Assertions.*;
++
++/**
++ * A run's settlement history remains fail-closed even when many unrelated
++ * runs are created, completed or abandoned. This tests behavior rather than
++ * implementation details of the internal O(1) claim-history lookup.
++ * Test candidates use only synthetic model fixtures, never production physics.
++ */
++class WorldEffectLedgerClaimIndexTest {
++    @Test
++    void mixedTerminalOutcomesAllPreventRunAbandonment() {
++        var world = new FakeWorldState();
++        var ledger = new WorldEffectLedger();
++        for (int i = 0; i < 3; i++) {
++            String run = "claimed-" + i;
++            var step = new CalculationStep(run, 0, new SimulationInterval(0, 1));
++            assertEquals(WorldEffectLedger.BeginResult.STARTED, ledger.beginCalculation(step));
++            var event = candidate(world, step, 0);
++            assertEquals(WorldEffectLedger.ClaimResult.CLAIMED,
++                    ledger.claim(event, precheck(world, event)));
++            if (i == 1) {
++                assertTrue(ledger.markApplied(event.eventKey()));
++            } else if (i == 2) {
++                assertTrue(ledger.markFailed(event.eventKey(), "partial mutation may have happened"));
++            }
++            assertEquals(WorldEffectLedger.AbandonResult.HAS_SETTLEMENT_CLAIMS,
++                    ledger.abandonRun(run));
++        }
++        assertEquals(3, ledger.claimedTransferCount());
++    }
++
++    @Test
++    void unclaimedRunsMayRetireDespiteLargeUnrelatedClaimHistory() {
++        var world = new FakeWorldState();
++        var ledger = new WorldEffectLedger();
++        for (int i = 0; i < 600; i++) {
++            var step = new CalculationStep("long-lived-run", i,
++                    new SimulationInterval(i * 2L, i * 2L + 1));
++            assertEquals(WorldEffectLedger.BeginResult.STARTED, ledger.beginCalculation(step));
++            var event = candidate(world, step, 0);
++            assertEquals(WorldEffectLedger.ClaimResult.CLAIMED,
++                    ledger.claim(event, precheck(world, event)));
++        }
++        for (int i = 0; i < 300; i++) {
++            String run = "stale-no-claims-" + i;
++            var step = new CalculationStep(run, 0, new SimulationInterval(0, 1));
++            assertEquals(WorldEffectLedger.BeginResult.STARTED, ledger.beginCalculation(step));
++            assertEquals(WorldEffectLedger.AbandonResult.ABANDONED, ledger.abandonRun(run));
++            assertTrue(ledger.isRunAbandoned(run));
++            assertEquals(WorldEffectLedger.BeginResult.RUN_ABANDONED,
++                    ledger.beginCalculation(new CalculationStep(run, 1,
++                            new SimulationInterval(1, 2))));
++        }
++        assertEquals(WorldEffectLedger.AbandonResult.HAS_SETTLEMENT_CLAIMS,
++                ledger.abandonRun("long-lived-run"));
++        assertEquals(600, ledger.claimedTransferCount());
++    }
++
++    @Test
++    void invalidClaimsDoNotBlockAnUnclaimedRunFromRetiring() {
++        var world = new FakeWorldState();
++        var ledger = new WorldEffectLedger();
++        var step = new CalculationStep("rejected-run", 0, new SimulationInterval(0, 1));
++        assertEquals(WorldEffectLedger.BeginResult.STARTED, ledger.beginCalculation(step));
++        var event = candidate(world, step, 0);
++        var mismatched = candidate(world, step, 0, 23.0);
++        assertEquals(WorldEffectLedger.ClaimResult.PRECHECK_CANDIDATE_MISMATCH,
++                ledger.claim(mismatched, precheck(world, event)));
++        assertEquals(WorldEffectLedger.AbandonResult.ABANDONED,
++                ledger.abandonRun("rejected-run"));
++        assertEquals(WorldEffectLedger.SettlementState.UNCLAIMED,
++                ledger.stateOf(event.eventKey()));
++    }
++
++    @Test
++    void duplicateEventDoesNotGrowClaimHistoryOrChangeTerminalState() {
++        var world = new FakeWorldState();
++        var ledger = new WorldEffectLedger();
++        var step = new CalculationStep("same-run", 0, new SimulationInterval(0, 1));
++        assertEquals(WorldEffectLedger.BeginResult.STARTED, ledger.beginCalculation(step));
++        var event = candidate(world, step, 0);
++        var check = precheck(world, event);
++        assertEquals(WorldEffectLedger.ClaimResult.CLAIMED, ledger.claim(event, check));
++        assertTrue(ledger.markApplied(event.eventKey()));
++        for (int i = 0; i < 20; i++) {
++            assertEquals(WorldEffectLedger.ClaimResult.DUPLICATE_TRANSFER,
++                    ledger.claim(event, check));
++        }
++        assertEquals(1, ledger.claimedTransferCount());
++        assertEquals(WorldEffectLedger.SettlementState.APPLIED,
++                ledger.stateOf(event.eventKey()));
++        assertEquals(WorldEffectLedger.AbandonResult.HAS_SETTLEMENT_CLAIMS,
++                ledger.abandonRun("same-run"));
++    }
++}
+--- a/neoforge-mod/build.gradle
++++ b/neoforge-mod/build.gradle
+@@ -79,6 +79,11 @@
+             'dev/coldatomcraft/experiment/world/ServerWorldSnapshot.class',
+             'dev/coldatomcraft/experiment/world/ServerEffectGate.class',
+             'dev/coldatomcraft/experiment/world/ServerEffectCommitCoordinator.class',
++            'dev/coldatomcraft/experiment/world/ServerMutationFacts.class',
++            'dev/coldatomcraft/experiment/world/ExperimentRunScheduler.class',
++            'dev/coldatomcraft/experiment/world/ExperimentReservation.class',
++            'dev/coldatomcraft/experiment/world/ApparatusKey.class',
++            'dev/coldatomcraft/experiment/world/ServerTickWindow.class',
+             'dev/coldatomcraft/experiment/world/DevicePlacement.class'
+         ]
+         def forbidden = [
+--- a/tools/inspect_mod_jar.py
++++ b/tools/inspect_mod_jar.py
+@@ -0,0 +1,141 @@
++#!/usr/bin/env python3
++"""Fail-closed *content* inspection of a built NeoForge JAR (not a runtime test).
++
++Uses the actual Gradle-compiled output directories as an independent class
++inventory, rather than checking only a small list of classes chosen in 2026.
++The command does NOT establish that Minecraft can load the JAR.
++"""
++from __future__ import annotations
++
++import argparse
++from dataclasses import asdict, dataclass
++import hashlib
++import json
++from pathlib import Path
++import struct
++import sys
++import tomllib
++from zipfile import ZipFile, BadZipFile
++
++CORE_MODULES = ("physics-core", "experiment-core", "neoforge-mod")
++REQUIRED = (
++    "META-INF/neoforge.mods.toml",
++    "dev/coldatomcraft/neoforge/ColdAtomCraft.class",
++    "dev/coldatomcraft/experiment/world/ExperimentRunScheduler.class",
++    "dev/coldatomcraft/experiment/world/ExperimentReservation.class",
++    "dev/coldatomcraft/experiment/world/WorldEffectLedger.class",
++    "dev/coldatomcraft/physics/Vec3.class",
++)
++FORBIDDEN = (
++    "dev/coldatomcraft/verification/Smoke.class",
++    "dev/coldatomcraft/experiment/world/FakeWorldState.class",
++    "org/junit/jupiter/api/Test.class",
++    "OfflineTestRunner.class",
++)
++EXPECTED_CLASS_MAJOR_JAVA25 = 69
++
++
++@dataclass
++class Inspection:
++    status: str
++    sha256: str
++    class_count: int
++    module_class_counts: dict[str, int]
++    findings: list[str]
++
++
++def props_from(root: Path) -> dict[str, str]:
++    out = {}
++    for line in (root / "gradle.properties").read_text(encoding="utf-8").splitlines():
++        line = line.strip()
++        if line and not line.startswith("#") and "=" in line:
++            k, v = line.split("=", 1)
++            out[k.strip()] = v.strip()
++    return out
++
++
++def inspect(jar_path: Path, root: Path, *, require_compiled: bool = True) -> Inspection:
++    findings: list[str] = []
++    counts: dict[str, int] = {}
++    sha = hashlib.sha256(jar_path.read_bytes()).hexdigest()
++    props = props_from(root)
++    try:
++        with ZipFile(jar_path) as archive:
++            members = archive.namelist()
++            names = set(members)
++            if len(names) != len(members):
++                findings.append("duplicate ZIP entry paths")
++            for required in REQUIRED:
++                if required not in names:
++                    findings.append(f"missing required entry: {required}")
++            for forbidden in FORBIDDEN:
++                if forbidden in names:
++                    findings.append(f"unexpected test/probe entry: {forbidden}")
++            for module in CORE_MODULES:
++                compiled = root / module / "build" / "classes" / "java" / "main"
++                if not compiled.is_dir():
++                    if require_compiled:
++                        findings.append(f"missing Gradle compiled output: {module}")
++                    counts[module] = 0
++                    continue
++                classes = sorted(compiled.rglob("*.class"))
++                counts[module] = len(classes)
++                if not classes:
++                    findings.append(f"empty compiled output: {module}")
++                for classfile in classes:
++                    name = classfile.relative_to(compiled).as_posix()
++                    if name not in names:
++                        findings.append(f"compiled class missing from JAR: {module}/{name}")
++            classfiles = [n for n in names if n.endswith(".class")]
++            for name in classfiles:
++                data = archive.read(name)
++                if len(data) < 8 or data[:4] != b"\xca\xfe\xba\xbe":
++                    findings.append(f"invalid classfile magic: {name}")
++                elif struct.unpack(">H", data[6:8])[0] != EXPECTED_CLASS_MAJOR_JAVA25:
++                    major = struct.unpack(">H", data[6:8])[0]
++                    findings.append(f"unexpected classfile major {major} (expected 69 for Java 25): {name}")
++            if "META-INF/neoforge.mods.toml" in names:
++                try:
++                    metadata = tomllib.loads(archive.read("META-INF/neoforge.mods.toml").decode("utf-8"))
++                    mods = metadata.get("mods")
++                    if not isinstance(mods, list) or not any(
++                        m.get("modId") == props["mod_id"] and m.get("version") == props["mod_version"]
++                        for m in mods if isinstance(m, dict)
++                    ):
++                        findings.append("mod ID/version do not match gradle.properties")
++                    dependencies = metadata.get("dependencies", {}).get(props["mod_id"], [])
++                    if not {"minecraft", "neoforge"}.issubset(
++                        {d.get("modId") for d in dependencies if isinstance(d, dict)}
++                    ):
++                        findings.append("minecraft / neoforge dependencies missing from metadata")
++                except (ValueError, UnicodeError, KeyError, TypeError, AttributeError) as exc:
++                    findings.append(f"invalid mod metadata: {exc}")
++            return Inspection("PASS" if not findings else "FAIL", sha, len(classfiles), counts, findings)
++    except (BadZipFile, OSError, RuntimeError) as exc:
++        return Inspection("FAIL", sha, 0, counts, [f"cannot read JAR: {exc}"])
++
++
++def main(argv: list[str] | None = None) -> int:
++    p = argparse.ArgumentParser(description=__doc__)
++    p.add_argument("--jar", required=True, type=Path)
++    p.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
++    p.add_argument("--allow-missing-build-outputs", action="store_true",
++                   help="history/diagnostic ONLY; disallowed for formal D4 release validation")
++    p.add_argument("--report", type=Path)
++    args = p.parse_args(argv)
++    try:
++        result = inspect(args.jar, args.root,
++                         require_compiled=not args.allow_missing_build_outputs)
++    except (OSError, KeyError) as exc:
++        print(f"JAR INSPECTION FAIL: {exc}", file=sys.stderr)
++        return 1
++    report = json.dumps(asdict(result), indent=2, ensure_ascii=False) + "\n"
++    print(report, end="")
++    if args.report:
++        args.report.parent.mkdir(parents=True, exist_ok=True)
++        args.report.write_text(report, encoding="utf-8")
++    return 0 if result.status == "PASS" else 1
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+--- a/tools/verify_m0.py
++++ b/tools/verify_m0.py
+@@ -0,0 +1,173 @@
++#!/usr/bin/env python3
++"""Opt-in, non-destructive JDK25 release-build evidence runner.
++
++Does NOT accept a Minecraft EULA, launch an independent production server,
++mutate an installed world, push to GitHub, or claim M0/Owner signoff.
++Exit 0: build/JUnit/JAR-content checks passed (NOT a runtime certificate).
++Exit 1: one attempted check failed. Exit 2: preflight missing prerequisite.
++"""
++from __future__ import annotations
++
++import argparse
++from datetime import datetime, timezone
++import hashlib
++import json
++from pathlib import Path
++import platform
++import re
++import subprocess
++import sys
++import time
++import uuid
++import xml.etree.ElementTree as ET
++
++from inspect_mod_jar import inspect
++
++MINIMUM_JUNIT_TEST_COUNT = 153  # D3's 149 + D4's four new @Test methods
++GRADLE_TASKS = (
++    "clean", ":physics-core:test", ":experiment-core:test",
++    ":neoforge-mod:build", ":neoforge-mod:verifyDistributableJar",
++    "--no-build-cache", "--rerun-tasks", "--no-daemon", "--stacktrace",
++)
++
++
++def junit_evidence(root: Path) -> dict:
++    flat = sorted(path for module in ("physics-core", "experiment-core")
++                  for path in (root / module / "build/test-results/test").glob("TEST-*.xml"))
++    counts = dict(tests=0, failures=0, errors=0, skipped=0, files=len(flat))
++    for path in flat:
++        tree = ET.parse(path)
++        report = tree.getroot()
++        if report.tag != "testsuite":
++            raise ValueError(f"JUnit XML is not a <testsuite>: {path}")
++        for key in ("tests", "failures", "errors", "skipped"):
++            counts[key] += int(report.attrib.get(key, "0"))
++    return counts
++
++
++def run(name: str, argv: list[str], root: Path, evidence: Path) -> dict:
++    log = evidence / (name + ".log")
++    start = time.monotonic()
++    print(f"RUN {name}: {' '.join(argv)}", flush=True)
++    try:
++        with log.open("wb") as stream:
++            result = subprocess.run(argv, cwd=root, stdout=stream,
++                                    stderr=subprocess.STDOUT, check=False)
++        status = "PASS" if result.returncode == 0 else "FAIL"
++        return dict(status=status, exit_code=result.returncode, log=str(log.relative_to(evidence)),
++                    seconds=round(time.monotonic() - start, 3))
++    except OSError as exc:
++        log.write_text(f"Cannot start command: {exc}\n", encoding="utf-8")
++        return dict(status="BLOCKED", exit_code=None, log=str(log.relative_to(evidence)),
++                    reason=str(exc))
++
++
++def sha256(path: Path) -> str:
++    return hashlib.sha256(path.read_bytes()).hexdigest()
++
++
++def main(argv: list[str] | None = None) -> int:
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
++    parser.add_argument("--evidence", type=Path,
++                        help="directory for local logs, default <root>/verification/local-jdk25/<timestamp>")
++    args = parser.parse_args(argv)
++    root = args.root.resolve()
++    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
++    evidence = (args.evidence or (root / "verification/local-jdk25" /
++                                  (stamp + "-" + uuid.uuid4().hex[:8]))).resolve()
++    evidence.mkdir(parents=True, exist_ok=True)
++    report = dict(
++        source_root=str(root),
++        timestamp_utc=stamp,
++        os=platform.platform(),
++        scope="M0-D4 source build/JUnit/JAR content only; NOT game startup or Owner signoff",
++        checks={},
++        actual_installed_jar_runtime="NOT RUN",
++        minecraft_client_runtime="NOT RUN",
++        minecraft_dedicated_server_runtime="NOT RUN",
++        actual_blender_export="NOT RUN",
++    )
++
++    def save() -> None:
++        (evidence / "report.json").write_text(
++            json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
++        print("Evidence report:", evidence / "report.json", flush=True)
++
++    try:
++        for name, command in (("java-version", ["java", "-version"]),
++                              ("javac-version", ["javac", "-version"])):
++            check = run(name, command, root, evidence)
++            report["checks"][name] = check
++            if check["status"] != "PASS":
++                report["status"] = "BLOCKED"
++                save()
++                return 2
++        version = (evidence / "javac-version.log").read_text(encoding="utf-8", errors="replace")
++        if not re.search(r"\bjavac\s+25(?:\.|\s|$)", version):
++            report["checks"]["jdk25-toolchain"] = dict(
++                status="BLOCKED", reason=f"requires javac 25; observed {version.strip()}")
++            report["status"] = "BLOCKED"
++            save()
++            return 2
++        report["checks"]["jdk25-toolchain"] = dict(status="PASS", version=version.strip())
++
++        if sys.platform == "win32":
++            smoke = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
++                     str(root / "tools/verify-core.ps1")]
++            gradle = ["cmd", "/c", str(root / "gradlew.bat")]
++        else:
++            smoke = ["bash", "tools/verify-core.sh"]
++            gradle = ["bash", "gradlew"]
++        steps = (
++            ("java25-smoke", smoke),
++            ("python-tests", [sys.executable, "-m", "unittest", "discover",
++                              "-s", "verification", "-p", "test_*.py", "-v"]),
++            ("asset-schema", [sys.executable, "tools/validate_assets.py",
++                              "assets/manifests/laser_source.example.json"]),
++            ("gradle-version", gradle + ["--version"]),
++            ("gradle-clean-build", gradle + list(GRADLE_TASKS)),
++        )
++        for name, command in steps:
++            check = run(name, command, root, evidence)
++            report["checks"][name] = check
++            if check["status"] != "PASS":
++                report["status"] = "FAIL" if check["status"] == "FAIL" else "BLOCKED"
++                save()
++                return 1 if report["status"] == "FAIL" else 2
++
++        junit = junit_evidence(root)
++        junit["status"] = "PASS" if (junit["tests"] >= MINIMUM_JUNIT_TEST_COUNT and
++                                      junit["failures"] == junit["errors"] == junit["skipped"] == 0 and
++                                      junit["files"] >= 2) else "FAIL"
++        report["checks"]["real-junit-xml"] = junit
++        if junit["status"] != "PASS":
++            report["status"] = "FAIL"
++            save()
++            return 1
++
++        jars = sorted((root / "neoforge-mod/build/libs").glob("coldatomcraft-*.jar"))
++        if len(jars) != 1:
++            report["checks"]["distributable-jar"] = dict(
++                status="FAIL", reason=f"expected one distributable JAR, found {len(jars)}")
++            report["status"] = "FAIL"
++            save()
++            return 1
++        inspection = inspect(jars[0], root, require_compiled=True)
++        report["checks"]["distributable-jar"] = dict(
++            status=inspection.status, sha256=inspection.sha256,
++            path=str(jars[0].relative_to(root)), entries_checked=inspection.class_count,
++            compiled_class_counts=inspection.module_class_counts,
++            findings=inspection.findings)
++        report["status"] = "PASS" if inspection.status == "PASS" else "FAIL"
++        save()
++        return 0 if inspection.status == "PASS" else 1
++    except Exception as exc:
++        report["checks"]["runner-error"] = dict(status="FAIL", error=repr(exc))
++        report["status"] = "FAIL"
++        save()
++        return 1
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+--- a/verification/test_jar_inspector.py
++++ b/verification/test_jar_inspector.py
+@@ -0,0 +1,98 @@
++"""Synthetic metadata/classfile tests; NOT a NeoForge installed-JAR check."""
++from __future__ import annotations
++
++from pathlib import Path
++import shutil
++import uuid
++import sys
++import unittest
++from zipfile import ZipFile
++
++sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
++from inspect_mod_jar import REQUIRED, inspect
++
++
++MOD_METADATA = '''license="All Rights Reserved"
++[[mods]]
++modId="coldatomcraft"
++version="0.0.1-dev"
++[[dependencies.coldatomcraft]]
++modId="minecraft"
++type="required"
++versionRange="[26.3]"
++[[dependencies.coldatomcraft]]
++modId="neoforge"
++type="required"
++versionRange="[26.3.0.99,)"
++'''
++
++
++def fake_class(major: int = 69) -> bytes:
++    return b"\xca\xfe\xba\xbe" + b"\x00\x00" + major.to_bytes(2, "big")
++
++
++class JarInspectorTest(unittest.TestCase):
++    def setUp(self):
++        # Match existing asset tests: Windows sandbox temporary directories may
++        # have a restrictive ACL even when the project workspace is writable.
++        self.root = Path(__file__).resolve().parents[1] / 'build' / 'python-test-tmp' / uuid.uuid4().hex
++        self.root.mkdir(parents=True)
++        self.addCleanup(lambda: shutil.rmtree(self.root, ignore_errors=True))
++        (self.root / "gradle.properties").write_text(
++            "mod_id=coldatomcraft\nmod_version=0.0.1-dev\n", encoding="utf-8")
++        self.jar = self.root / "mod.jar"
++        self.classes = {}
++        for module, filename in [
++            ("physics-core", "dev/coldatomcraft/physics/Vec3.class"),
++            ("experiment-core", "dev/coldatomcraft/experiment/world/ExperimentRunScheduler.class"),
++            ("neoforge-mod", "dev/coldatomcraft/neoforge/ColdAtomCraft.class"),
++        ]:
++            path = self.root / module / "build/classes/java/main" / filename
++            path.parent.mkdir(parents=True, exist_ok=True)
++            path.write_bytes(fake_class())
++            self.classes[module] = filename
++
++    def make_jar(self, *, omit=None, major=69, additional=None, metadata=MOD_METADATA):
++        with ZipFile(self.jar, "w") as z:
++            for name in REQUIRED:
++                if name == omit:
++                    continue
++                z.writestr(name, metadata if name.endswith(".toml") else fake_class(major))
++            for name, contents in (additional or {}).items():
++                z.writestr(name, contents)
++
++    def test_valid_compiled_inventory_and_metadata_pass(self):
++        self.make_jar()
++        self.assertEqual("PASS", inspect(self.jar, self.root).status)
++
++    def test_missing_required_class_fails(self):
++        self.make_jar(omit="dev/coldatomcraft/physics/Vec3.class")
++        self.assertTrue(any("missing" in x for x in inspect(self.jar, self.root).findings))
++
++    def test_missing_individual_compiled_class_fails(self):
++        self.make_jar()
++        extra = self.root / "experiment-core/build/classes/java/main/dev/coldatomcraft/experiment/world/FutureClass.class"
++        extra.write_bytes(fake_class())
++        self.assertTrue(any("FutureClass" in x for x in inspect(self.jar, self.root).findings))
++
++    def test_wrong_java_version_fails(self):
++        self.make_jar(major=65)
++        self.assertTrue(any("major 65" in x for x in inspect(self.jar, self.root).findings))
++
++    def test_forbidden_test_class_fails(self):
++        self.make_jar(additional={"OfflineTestRunner.class": fake_class()})
++        self.assertTrue(any("probe" in x for x in inspect(self.jar, self.root).findings))
++
++    def test_invalid_mod_version_fails(self):
++        self.make_jar(metadata=MOD_METADATA.replace('version="0.0.1-dev"', 'version="incorrect"'))
++        self.assertTrue(any("ID/version" in x for x in inspect(self.jar, self.root).findings))
++
++    def test_missing_build_outputs_fails_in_formal_mode(self):
++        self.make_jar()
++        (self.root / "physics-core/build/classes/java/main/dev/coldatomcraft/physics/Vec3.class").unlink()
++        # Directory still exists and contains no files.
++        self.assertTrue(any("empty compiled" in x for x in inspect(self.jar, self.root).findings))
++
++
++if __name__ == "__main__":
++    unittest.main()
+--- a/verification/test_verify_m0.py
++++ b/verification/test_verify_m0.py
+@@ -0,0 +1,52 @@
++"""Test evidence parser without invoking Gradle or claiming game validation."""
++from pathlib import Path
++import sys
++import shutil
++import unittest
++import uuid
++
++sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
++from verify_m0 import junit_evidence, MINIMUM_JUNIT_TEST_COUNT
++
++
++class EvidenceParserTest(unittest.TestCase):
++    def setUp(self):
++        self.root = Path(__file__).resolve().parents[1] / 'build' / 'python-test-tmp' / uuid.uuid4().hex
++        self.root.mkdir(parents=True)
++        self.addCleanup(lambda: shutil.rmtree(self.root, ignore_errors=True))
++
++    def write_xml(self, module, filename, *, tests, failures=0, errors=0, skipped=0):
++        folder = self.root / module / 'build/test-results/test'
++        folder.mkdir(parents=True, exist_ok=True)
++        (folder / filename).write_text(
++            f'<testsuite tests="{tests}" failures="{failures}" '
++            f'errors="{errors}" skipped="{skipped}"/>', encoding='utf-8')
++
++    def test_empty_results_must_not_look_like_success(self):
++        self.assertEqual({'tests': 0, 'failures': 0, 'errors': 0, 'skipped': 0, 'files': 0},
++                         junit_evidence(self.root))
++
++    def test_reports_from_both_modules_are_counted(self):
++        self.write_xml('physics-core', 'TEST-Physics.xml', tests=9)
++        self.write_xml('experiment-core', 'TEST-Experiment.xml', tests=144)
++        counts = junit_evidence(self.root)
++        self.assertEqual(MINIMUM_JUNIT_TEST_COUNT, counts['tests'])
++        self.assertEqual(2, counts['files'])
++        self.assertEqual(0, counts['failures'])
++
++    def test_failures_errors_and_skips_are_not_ignored(self):
++        self.write_xml('experiment-core', 'TEST-Bad.xml', tests=6, failures=1, errors=2, skipped=1)
++        counts = junit_evidence(self.root)
++        self.assertEqual((6, 1, 2, 1),
++                         (counts['tests'], counts['failures'], counts['errors'], counts['skipped']))
++
++    def test_wrong_xml_element_is_rejected(self):
++        folder = self.root / 'physics-core/build/test-results/test'
++        folder.mkdir(parents=True, exist_ok=True)
++        (folder / 'TEST-Wrong.xml').write_text('<not-testsuite/>', encoding='utf-8')
++        with self.assertRaises(ValueError):
++            junit_evidence(self.root)
++
++
++if __name__ == '__main__':
++    unittest.main()

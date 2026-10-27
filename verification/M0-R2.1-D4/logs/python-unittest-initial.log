@@ -1,0 +1,29 @@
+test_anchor_prefix_must_match_role (test_asset_validator.ManifestTests.test_anchor_prefix_must_match_role) ... ok
+test_bad_numeric_unit (test_asset_validator.ManifestTests.test_bad_numeric_unit) ... ok
+test_blender_axes_must_be_explicit (test_asset_validator.ManifestTests.test_blender_axes_must_be_explicit) ... ok
+test_duplicate_anchor (test_asset_validator.ManifestTests.test_duplicate_anchor) ... ok
+test_forward_axis_and_vector_must_agree (test_asset_validator.ManifestTests.test_forward_axis_and_vector_must_agree) ... ok
+test_invalid_coordinates (test_asset_validator.ManifestTests.test_invalid_coordinates) ... ok
+test_invalid_device_id (test_asset_validator.ManifestTests.test_invalid_device_id) ... ok
+test_invalid_or_unsafe_paths (test_asset_validator.ManifestTests.test_invalid_or_unsafe_paths) ... ok
+test_malicious_json_types_fail_as_manifest_errors (test_asset_validator.ManifestTests.test_malicious_json_types_fail_as_manifest_errors) ... ok
+test_optical_forward_must_be_unit (test_asset_validator.ManifestTests.test_optical_forward_must_be_unit) ... ok
+test_optical_output_requires_forward (test_asset_validator.ManifestTests.test_optical_output_requires_forward) ... ok
+test_ready_rejects_impostor_blend_header (test_asset_validator.ManifestTests.test_ready_rejects_impostor_blend_header) ... ok
+test_ready_rejects_malformed_glb_chunks (test_asset_validator.ManifestTests.test_ready_rejects_malformed_glb_chunks) ... ok
+test_ready_requires_interchange_axes_and_optical_vector (test_asset_validator.ManifestTests.test_ready_requires_interchange_axes_and_optical_vector) ... ok
+test_ready_requires_real_files_and_coordinates (test_asset_validator.ManifestTests.test_ready_requires_real_files_and_coordinates) ... ok
+test_reference_is_spec_only (test_asset_validator.ManifestTests.test_reference_is_spec_only) ... ok
+test_wrong_schema (test_asset_validator.ManifestTests.test_wrong_schema) ... ok
+test_forbidden_test_class_fails (test_jar_inspector.JarInspectorTest.test_forbidden_test_class_fails) ... ok
+test_invalid_mod_version_fails (test_jar_inspector.JarInspectorTest.test_invalid_mod_version_fails) ... ok
+test_missing_build_outputs_fails_in_formal_mode (test_jar_inspector.JarInspectorTest.test_missing_build_outputs_fails_in_formal_mode) ... ok
+test_missing_individual_compiled_class_fails (test_jar_inspector.JarInspectorTest.test_missing_individual_compiled_class_fails) ... ok
+test_missing_required_class_fails (test_jar_inspector.JarInspectorTest.test_missing_required_class_fails) ... ok
+test_valid_compiled_inventory_and_metadata_pass (test_jar_inspector.JarInspectorTest.test_valid_compiled_inventory_and_metadata_pass) ... ok
+test_wrong_java_version_fails (test_jar_inspector.JarInspectorTest.test_wrong_java_version_fails) ... ok
+
+----------------------------------------------------------------------
+Ran 24 tests in 0.020s
+
+OK

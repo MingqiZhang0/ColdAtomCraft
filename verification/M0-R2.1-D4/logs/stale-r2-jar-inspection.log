@@ -1,0 +1,14 @@
+{
+  "status": "FAIL",
+  "sha256": "4eba8c7438d17824aceda415dbac6785ce3368304e7d7ec6ad82d800b0a6961c",
+  "class_count": 34,
+  "module_class_counts": {
+    "physics-core": 0,
+    "experiment-core": 0,
+    "neoforge-mod": 0
+  },
+  "findings": [
+    "missing required entry: dev/coldatomcraft/experiment/world/ExperimentRunScheduler.class",
+    "missing required entry: dev/coldatomcraft/experiment/world/ExperimentReservation.class"
+  ]
+}

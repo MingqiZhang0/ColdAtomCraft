@@ -1,0 +1,25 @@
+package dev.coldatomcraft.experiment.world;
+
+import static dev.coldatomcraft.experiment.world.ContractTestSupport.*;
+
+/** RED baseline: isolated experiment sessions may claim identical physical operation. */
+public final class D2ResourceConflictRed {
+    public static void main(String[] args) {
+        var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
+        var first = scheduler.createExperiment().attempt();
+        var second = scheduler.createExperiment().attempt();
+        var world = new FakeWorldState();
+        var window = new SimulationInterval(0, 1_000);
+        scheduler.beginStep(first, 0, window);
+        scheduler.beginStep(second, 0, window);
+        var a = candidate(world, new CalculationStep(first.runId(),0,window),0);
+        var b = candidate(world, new CalculationStep(second.runId(),0,window),0);
+        var aResult=scheduler.submit(first,a,precheck(world,a),world.snapshot(),ALL_SERVER_FACTS);
+        var bResult=scheduler.submit(second,b,precheck(world,b),world.snapshot(),ALL_SERVER_FACTS);
+        System.out.println("D2 ORIGINAL GAP first="+aResult.status()+" second="+bResult.status()+
+                " total="+scheduler.claimedTransferCount());
+        if (aResult.claimed() && bResult.claimed() && scheduler.claimedTransferCount()==2) {
+            System.out.println("RED BASELINE CONFIRMED: two independently created sessions can claim same source and simulated slice");
+        } else throw new AssertionError("unexpected existing protection: audit baseline needs reexamination");
+    }
+}

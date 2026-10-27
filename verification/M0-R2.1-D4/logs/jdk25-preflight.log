@@ -1,0 +1,3 @@
+RUN java-version: java -version
+RUN javac-version: javac -version
+Evidence report: /mnt/data/cac_d4_work/ColdAtomCraft-M0-R2.1-D4/verification/M0-R2.1-D4/local-preflight/report.json

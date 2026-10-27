@@ -1,0 +1,23 @@
+license="All Rights Reserved"
+[[mods]]
+modId="coldatomcraft"
+version="0.0.1-dev"
+displayName="Cold Atom Craft"
+description='''
+An experimental NeoForge mod for cold-atom physics and interacting Minecraft apparatus.
+M0 scaffold: no working instruments are registered yet.
+'''
+
+[[dependencies.coldatomcraft]]
+modId="neoforge"
+type="required"
+versionRange="[26.3.0.99,)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.coldatomcraft]]
+modId="minecraft"
+type="required"
+versionRange="[26.3]"
+ordering="NONE"
+side="BOTH"

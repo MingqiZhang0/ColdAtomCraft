@@ -1,0 +1,826 @@
+--- a/README.md
++++ b/README.md
+@@ -1,15 +1,28 @@
+ # Cold Atom Craft (CAC)
+ 
+-**Status:** M0-R2 engineering audit (2026-10-26). **M0 is not yet accepted and this is not a playable laser mod.**
++**Status:** M0-R2.1-D1 director engineering checkpoint (2026-10-26). **M0 remains open; no playable laser or owner-approved physical models are included.**
+ 
+ Cold Atom Craft is a Minecraft Java 26.3 + NeoForge cold-atom laboratory project: laser optics and world interaction, then MOT, BEC, optical lattices and a neutral-atom quantum computing branch. Apparatus should affect and be affected by the actual Minecraft world, not just a GUI progress bar.
+ 
+ ## Division of responsibility
+ 
+ - **Project owner:** research direction, physical equations and assumptions, key scientific choices, Blender source assets/visual design, final release decisions.
+-- **Engineering assistant:** Java/NeoForge code, numerical implementation of owner-approved models, Blender asset import, testing, profiling and defect reports.
++- **ChatGPT (code director):** architecture, source review, safety contracts, verification planning and interim engineering fixes.
++- **DeepSeek (lead programmer):** primary Java/NeoForge implementation, build/test execution and performance work (current deliverable is a director checkpoint, not a DeepSeek release).
+ 
+ Owner approval and actual numerical verification are tracked separately. Physical models for ray transport, heating and injury have **not** been accepted and are **not** included.
++
++## M0-R2.1-D1 status and provenance
++
++This directory is an **engineering checkpoint derived from** the uploaded `ColdAtomCraft-M0-R2.1-Checkpoint.zip`, not a validated Java 25/NeoForge release artifact.
++
++- R2.1 introduced complete-candidate precheck binding, exact interval matching, server-side revalidation *contracts*, and a per-run interval index. Historic 113/113 JUnit XML results came from DeepSeek's intermediate Windows run; they are not new final-build results.
++- D1 adds `WorldEffectLedger.abandonRun` with fail-closed behavior: only a run with **no settlement claims** can be retired; late claims and new steps under that run ID are rejected. Re-executing the solver must use a distinct server-owned run ID.
++- D1 adds a 5-method JUnit regression class and aligns two existing stale-recalculation tests with that lifecycle contract. A standalone smoke program also exercises a repeated Claim/Abandon race.
++- On the available **Linux JDK 21** environment: standalone `Smoke` **363/363 PASS**, Python asset tests **17/17 PASS**, and **118 test methods** passed an independent temporary offline assertion runner. **The latter is not the JUnit engine.** This environment lacks JDK 25 and reachable dependency repositories; formal Gradle/JUnit/NeoForge build and production JAR installation of D1 are **NOT RUN**.
++- Previous Minecraft 26.3/NeoForge 26.3.0.99 client/server success is M0-R2 historical evidence, **not evidence for this modified D1 code**.
++
++See [D1 audit](docs/M0_R2_1_D1_AUDIT.md), [world contract](docs/WORLD_INTERACTION_CONTRACT.md), and [performance audit](docs/PERFORMANCE_AUDIT.md). The Owner has not closed M0.
+ 
+ ## Verified M0-R2 baseline
+ 
+@@ -45,8 +58,8 @@
+ 
+ ## Current evidence
+ 
+-- `physics-core` and `experiment-core` JUnit: **49/49 PASS** in the M0-R2 audit.
+-- Standalone Java smoke: **46/46 PASS** (no Minecraft classpath).
++- `physics-core` and `experiment-core` JUnit: **49/49 PASS** in the historic M0-R2 audit; later R2.1 submission contains **113/113 PASS** XML (not a D1 final-build result).
++- D1 independent standalone Java smoke: **363/363 PASS** under JDK 21 (no Minecraft classpath).
+ - Python asset-manifest tests: **17/17 PASS**.
+ - `:neoforge-mod:build` and JAR-content verification: **PASS** with the official non-recompilation pipeline.
+ - Official MDK control project with the same runtime baseline: **PASS**.
+@@ -81,10 +94,10 @@
+ 
+ ## Next actions
+ 
+-1. Install the packaged JAR in a clean production NeoForge client/server and repeat the launch checks from that artifact.
+-2. Run the CI workflow on an actual GitHub runner and retain the run URL/log.
+-3. Receive the owner's first laser source `.blend`/GLB handoff and validate actual Blender export plus in-game rendering.
+-4. Implement the real NeoForge server snapshot/mutation adapter and durable ledger before any world effect is enabled.
+-5. Only after owner-approved equations, implement and numerically verify OPT-001; do not conflate it with THM-001 or BIO-001.
++1. Execute **D1** on a JDK 25/NeoForge 26.3.0.99 environment: formal JUnit, clean/no-cache Gradle build, JAR content checks and, if possible, separate production-instance JAR installation. Do not substitute M0-R2's historical JAR.
++2. Run CI on a real GitHub runner and retain the URL/log.
++3. Require the future server experiment scheduler to serialize logical-experiment retries: the ledger can abandon only unclaimed runs; it does not prevent independently invented run IDs from duplicating earlier world effects.
++4. Build a real NeoForge server snapshot/mutation adapter and durable recovery protocol **before enabling any physical world effect**.
++5. Accept the owner's first laser `.blend`/GLB handoff and science intake before implementing OPT-001 in the game. Physically meaningful formulas remain owner-controlled.
+ 
+-Primary docs: [Charter](docs/PROJECT_CHARTER.md) · [Architecture](docs/ARCHITECTURE.md) · [World Interaction](docs/WORLD_INTERACTION_CONTRACT.md) · [Science Intake](docs/M1_SCIENCE_INTAKE.md) · [Blender Handoff](docs/BLENDER_ASSET_HANDOFF.md) · [M0-R2 Audit](docs/M0_R2_AUDIT.md).
++Primary docs: [D1 Audit](docs/M0_R2_1_D1_AUDIT.md) · [Charter](docs/PROJECT_CHARTER.md) · [Architecture](docs/ARCHITECTURE.md) · [World Interaction](docs/WORLD_INTERACTION_CONTRACT.md) · [Science Intake](docs/M1_SCIENCE_INTAKE.md) · [Blender Handoff](docs/BLENDER_ASSET_HANDOFF.md) · [M0-R2 Audit](docs/M0_R2_AUDIT.md).
+--- a/docs/ARCHITECTURE.md
++++ b/docs/ARCHITECTURE.md
+@@ -1,4 +1,4 @@
+-# Architecture boundary — M0-R2
++# Architecture boundary — M0-R2.1-D1 (M0 still open)
+ 
+ **Status:** engineering proposal implemented only where explicitly indicated.
+ **Scientific algorithms:** OPT-001, OPT-002, THM-001 and BIO-001 remain PENDING_OWNER_MODEL.
+@@ -40,13 +40,13 @@
+ Current pure-Java sequence (no mutation implemented):
+ 
+ 1. On the main server thread, capture `DeviceSnapshot`, `TargetSnapshot` and a `WorldReadSet` containing every consulted chunk. Each chunk records `loadEpoch`, `contentRevision` and `loaded`.
+-2. Call `WorldEffectLedger.beginCalculation(step)` before any solver work. A duplicate step or overlapping interval in the same run is rejected.
++2. Call `WorldEffectLedger.beginCalculation(step)` before any solver work. A duplicate step or overlapping interval in the same run is rejected; a run explicitly abandoned after a stale result cannot be restarted.
+ 3. Run read-only physics calculations from immutable snapshots (if significant work is justified). Keep game world mutations off worker threads.
+ 4. Return candidates with model revision, step identity, unique event index and the **full** `WorldReadSet`; not just the endpoint chunk.
+-5. Call `WorldEffectGate.precheck`. It checks the model catalog record, every revision, the device state and target identity/position. This is a precheck only.
++5. Call `WorldEffectGate.precheck`. It checks the supplied model definition's approval/verification status, every revision, the device state and target identity/position. This is a precheck only; the subsequent coordinator independently resolves the model from a trusted server catalog.
+ 6. On the main server thread, independently capture fresh server facts and call `ServerEffectGate`. The future adapter must verify target identity/position, chunk load state and permissions again.
+ 7. Call `WorldEffectLedger.claim` immediately before the future mutation. Claim once; on failure do not retry.
+-8. Apply approved game effects or discard stale candidates. Record the reason for rejecting candidates in diagnostic logs.
++8. Apply approved game effects or discard stale candidates. **After a stale rejection before any settlement Claim, the scheduler may call `abandonRun(oldRunId)` and perform a genuine recomputation only under a fresh server-owned run ID.** Late results from an abandoned run are rejected. If any transfer has been claimed, abandonment fails closed; no automatic replay is authorized. Record rejection and disposition in diagnostic logs.
+ 
+ `WorldReadSet` + `WorldEffectGate` implement only the first layer of these checks.
+ World snapshot collection, revision incrementing, event integration, permissions,
+@@ -87,3 +87,9 @@
+ - Limit segment count, splits, ray length, work queues and queued asynchronous results.
+ - Measure server tick time and client frame time separately.
+ - Never identify a good FPS screenshot as proof the dedicated server maintains 20 TPS.
++
++## R2.1-D1 run lifecycle refinement
++
++`WorldEffectLedger.abandonRun(runId)` is a deliberately small pure-Java fence for stale, **unclaimed** calculation runs. It returns `ABANDONED`, `ALREADY_ABANDONED`, `UNKNOWN_RUN`, `HAS_SETTLEMENT_CLAIMS`, or `INVALID`. The aborted run identity and all its step tombstones remain in memory. `beginCalculation` and `claim` both reject this run ID. `ServerEffectCommitCoordinator` surfaces this as `RUN_ABANDONED` after current server-state revalidation.
++
++Synchronization prevents a same-ledger race between claiming an event and retiring its run. **It does not bind separate run IDs to the same logical experiment**, prevent an external scheduler from reusing a physical interval after successful world mutation, persist tombstones after restart, or close the final NeoForge TOCTOU window. These remain requirements of the future server-owned scheduling and mutation adapter. See `docs/WORLD_INTERACTION_CONTRACT.md`.
+--- a/docs/CHANGELOG.md
++++ b/docs/CHANGELOG.md
+@@ -1,4 +1,14 @@
+ # Changelog
++
++## M0-R2.1-D1 · 2026-10-26 · Director checkpoint (not a release)
++
++- Continued the partially completed DeepSeek R2.1 source without changing any physical model or Blender geometry.
++- Introduced explicit `WorldEffectLedger.abandonRun` for stale, **unclaimed** calculation runs; refuses runs with any claimed event and fences late result claims under retired run IDs.
++- Added `RUN_ABANDONED` to Ledger begin/claim and coordinator decision results; actual solver re-execution must use a new server-owned run ID.
++- Added five JUnit test methods covering lifecycle, stale computation, terminal settlements, unknown runs and concurrent Claim/Abandon arbitration; aligned two misleading same-run recalculation tests with the new protocol.
++- Expanded dependency-free Java smoke to 363 checks including 100 synchronized two-thread arbitration trials. Python asset tests remain 17/17.
++- Independently exercised 118 test methods through a temporary offline assertion runner under JDK 21; **not a formal JUnit result**. Re-ran JDK 21 performance probe at 1k/10k/50k step scales; results are host-specific, not direct cross-host speedup claims.
++- Updated world contract, architecture, decisions, audit and provenance; regenerated manifest. JDK 25 Gradle/NeoForge final build and production JAR installation remain NOT RUN for this D1 tree. M0 remains open.
+ 
+ ## M0-R2 · 2026-10-26 · Build, runtime and world-contract audit
+ 
+--- a/docs/DECISIONS.md
++++ b/docs/DECISIONS.md
+@@ -57,3 +57,12 @@
+ - Decision: retain Blender `+Z` up / `-Y` forward and add explicit glTF `+Y` up / `+Z` forward metadata for integrated assets.
+ - Decision: `DevicePlacement` exposes both Blender-space and glTF-space conversion methods; they are tested to agree after the standard Blender exporter conversion.
+ - Status: manifest/coordinate logic verified. No owner Blender model was received; actual Blender export and Minecraft renderer integration remain NOT RUN.
++
++## CAC-009 - 2026-10-26 - Director interim stale-run lifecycle (M0-R2.1-D1)
++
++- Engineering decision: an invalidated solver run may be explicitly **abandoned only before any event has been claimed**. Retirement is in-memory and retains run/step tombstones; late claims must fail closed.
++- Engineering decision: actual solver recomputation after stale inputs requires a new server-owned calculationRunId, not a repeated `beginCalculation` for the same `(runId, stepIndex)`.
++- Engineering safety limit: a run with CLAIMED/APPLIED/FAILED events cannot be abandoned, even if the failure may have been only partial; the scheduler must halt and reconcile rather than automatically re-run.
++- Authority: code-director interface refinement, **not** Owner approval of any physical model, physical constants, world-effect damage law or final M0 closure.
++- Unresolved: future scheduler must enforce logical-experiment exclusivity across different run IDs and decide a durable recovery strategy before enabling real world modification.
++- Status: implemented and offline-tested in D1; JDK 25/NeoForge integration pending.
+--- /dev/null
++++ b/docs/M0_R2_1_D1_AUDIT.md
+@@ -0,0 +1,88 @@
++# CAC-M0-R2.1-D1 — Code Director Engineering Checkpoint Audit
++
++**Date:** 2026-10-26  
++**Input:** `ColdAtomCraft-M0-R2.1-Checkpoint.zip` (SHA-256 `bf7bdcaac986906631a078b5047080fbcd9b89c7854a3da39f3c6893091024c1`).  
++**Parent uploaded R2.1 work ZIP:** SHA-256 `a172f466a620cf8de5a3a6243ec0384c121750066be7cffa4de3bdf8b6937567`.  
++**Implementation:** ChatGPT temporary engineering continuation based on DeepSeek's unfinished R2.1 checkpoint.  
++**Approval authority:** Owner directs science, Blender geometry and M0 closure.  
++**Status:** **DIRECTOR CHECKPOINT / NOT A RELEASE / M0 OPEN**.
++
++## 1. Executive decision
++
++The partial R2.1 input already addressed the three previously reproduced P1 defects in pure Java: complete candidate-to-precheck binding, registered time-interval verification, and an explicit server revalidation/claim coordinator contract. Those code changes were retained; no owner-supplied optical, thermal, material or biological model was fabricated.
++
++This D1 continuation resolves a remaining **workflow ambiguity**: a stale physical solver run cannot be re-executed with the same `(runId, stepIndex)` while `beginCalculation` has already reserved that identity. A new `abandonRun(runId)` method retires **unclaimed** runs and blocks all late claims from them; genuine recomputation requires a new server-issued run ID. The coordinator surfaces this rejection explicitly as `RUN_ABANDONED`.
++
++**Security limitation:** a run with *any* claimed event cannot be abandoned, because even FAILED or CLAIMED events may have partially or fully changed the world. A future authoritative experiment scheduler must serialize different run IDs representing the same logical experiment. This ledger does not implement cross-run exclusivity, persistence, atomic world mutations, or a live NeoForge server adapter. This D1 contract is not production TOCTOU closure.
++
++## 2. Actual source modifications
++
++- `WorldEffectLedger.java`: `AbandonResult` enum, `abandonRun` and `isRunAbandoned`, in-memory run tombstones, `RUN_ABANDONED` results from begin/claim, serialized with existing claim lock. Abort checks all claimed events and refuses nonempty settlement history.
++- `ServerEffectCommitCoordinator.java`: distinct `Decision.RUN_ABANDONED` rather than a generic ledger rejection.
++- `WorldEffectLedgerRunAbandonmentTest.java`: five new formal JUnit test methods (compiled and executed in the offline compatibility sweep, **not run under JUnit engine here**).
++- Existing stale-recomputation tests in `ServerEffectCommitCoordinatorTest` and `PrecheckCandidateBindingTest`: remove misleading same-run actual re-execution assumptions, assert explicit abandonment and fresh run ID.
++- `verification/Smoke.java`: additional lifecycle checks and 100 two-thread Claim/Abandon contests per run; latest output 363 engineering checks.
++- `README.md`, architecture, world contract, tests, changelog, decisions, performance and present audit: updated to distinguish **historic M0-R2**, **incoming R2.1**, and **current D1** evidence.
++
++The complete relative-source diff and file list appear in `verification/M0-R2.1-D1/source-diff.patch` and `file-diff.csv`.
++
++## 3. Evidence: executed here vs previously reported
++
++| Task / gate | Status | Exact scope |
++| --- | --- | --- |
++| Original checkpoint integrity | **PASS** | `sha256sum -c` of 141-file input manifest before editing |
++| Pure-Java main source compilation | **PASS** | `javac --release 21`; current Linux OpenJDK 21, **not** Java 25 |
++| Java standalone smoke | **PASS** | 363/363 checks per run; 3 consecutive runs, 100 Claim/Abandon two-thread contests each |
++| Python asset validator tests | **PASS** | 17/17, `python -m unittest discover ...` |
++| Ad-hoc reflection assertion sweep | **PASS, NOT JUNIT** | 118/118 methods from original + new `@Test` sources compiled with a temporary local compatibility API; not JUnit engine or Gradle results |
++| Static pure-core import boundary scan | **PASS** | No `net.minecraft`/`net.neoforged` imports in physics/experiment main sources |
++| Model approval / actual game mutation scan | **PASS for current empty adapter** | No production owner-approved models or active world mutation API calls in NeoForge main sources |
++| Ledger benchmark rerun on incoming and D1 | **PASS as observation** | Same Linux JDK 21 / `-Xmx768m` host, synthetic 1k/10k/50k steps and 20k claim workload; see `PERFORMANCE_AUDIT.md` |
++| Historic R2.1 JUnit XML | **RECORDED, NOT RE-RUN** | Incoming uploaded evidence showed 113/113 pass from DeepSeek's intermediate Windows worktree; does not cover new D1 tests |
++| Official JDK 25 Gradle/JUnit for D1 | **NOT RUN** | Current environment has only JDK 21 and cannot resolve the required remote build repositories |
++| D1 full NeoForge `:neoforge-mod:build` | **NOT RUN** | Same dependency/toolchain limitation |
++| D1 packaged JAR contents / installed-JAR runtime | **NOT RUN** | No D1 distributable JAR generated; old JARs in evidence folders are historical, **not D1 outputs** |
++| D1 development client/dedicated server | **NOT RUN** | Previous M0-R2 client/server success does not verify changed D1 tree |
++| GitHub CI / GameTestServer | **NOT RUN** | No CI runner; no legitimate GameTest implemented |
++| Blender actual export / rendering | **BLOCKED / NOT RUN** | No Owner `.blend` device asset supplied, no new renderer implemented |
++| Owner scientific model / project Gate | **PENDING** | No Owner approval to close M0 or implement particular OPT/thermal/damage equations |
++
++Executed evidence files: `verification/M0-R2.1-D1/`.
++
++## 4. Failure/retry semantic matrix
++
++| Situation | D1 behavior | Status |
++| --- | --- | --- |
++| Stale candidate rejected before any claim | No settlement consumed; run **may be abandoned** explicitly | Implemented in pure Java |
++| Run successfully abandoned | New steps and late claims under old run ID are rejected | Implemented and tested |
++| Original solver truly re-executes | Requires a different, server-issued run ID | Contract/test; no production scheduler yet |
++| Abandon competing with Claim | Inside one synchronized ledger, Claim or Abandon wins, never both | 100 repeated two-thread smoke contests plus test source |
++| Any event CLAIMED/APPLIED/FAILED | Abandon refused; no automatic replay | Implemented, fail closed |
++| New run created while unrelated old run has claimed events | **Not prevented**: lacks logical-experiment binding | Future P0 for world mutation |
++| Claim then server/world exception | Claim stays terminal or explicitly FAILED; possible lost/partial effect | Existing code contract; not transactional |
++| Restart then retry | Ledger/tombstones lost; exactly-once across restart not guaranteed | Future durable recovery |
++
++## 5. Performance and memory
++
++- Step registration remains indexed by TreeMap, expected O(log n), with an additional expected O(1) set membership check.
++- `abandonRun` scans existing settlement keys, O(M), under the ledger lock. It is deliberately an exceptional path, never an every-tick operation; a per-run claim counter may be introduced only if profiling warrants it.
++- On the same JDK 21 host, 50,000 registrations had medians of **27.040 ms** (incoming baseline) vs **28.173 ms** (D1); this small difference is inconclusive, not a formal performance regression. Retention estimates were about **8.249 MiB** for 50,000 steps in both runs.
++- The ledger has **unbounded in-memory history**; no unsafe eviction was implemented.
++
++## 6. Source trust boundaries preserved
++
++- `physics-core` and `experiment-core` remain pure Java without Minecraft or NeoForge class imports.
++- `WorldEffectGate.Precheck` is data-only, not a grant of server mutation authority.
++- `ServerEffectCommitCoordinator` only reaches the in-memory settlement state `CLAIMED`; no world mutation exists.
++- Synthetic `OWNER_APPROVED` fixtures are used exclusively by tests or standalone verification, never as production Owner approval.
++- `Blender` visual assets were not generated or modified, and no OPT-001 optical equations were selected in this engineering round.
++
++## 7. Unresolved release blockers
++
++1. **P0 for any real world modification:** implement a NeoForge server-authoritative snapshot/permission/commit adapter, with a scheduler that keeps different run IDs from duplicating the same logical experiment.
++2. **P0 for crash-safe world-effect delivery:** specify atomic mutation/settlement/durable recovery semantics, or define an explicit weaker delivery guarantee acceptable for gameplay before enabling destructive effects.
++3. **Required to claim D1 build parity:** re-run full formal JDK 25 JUnit + clean/no-cache Gradle build, verify the newly built D1 JAR's contents, and test the installed JAR in an independent NeoForge instance.
++4. **Required for M0-G5:** Owner reviews/accepts the current engineering and scientific handoff gates. Blender delivery and scientific equations are separate future stages, not implied by M0-Java smoke.
++5. **For long runs:** plan bounded experiment memory, tombstone lifetime and performance under real server TPS load.
++
++**Director conclusion:** D1 is a useful, self-consistent pure-Java engineering continuation with measured tests. It is **NOT READY FOR FULL M0 OR PRODUCTION-WORLD-EFFECT RELEASE**; status `READY_FOR_JDK25_BUILD_AND_DIRECTOR_RECHECK`.
+--- /dev/null
++++ b/docs/PERFORMANCE_AUDIT.md
+@@ -0,0 +1,33 @@
++# WorldEffectLedger performance audit — M0-R2.1-D1
++
++**Scope:** in-memory step-index registration and transfer claim, not a proof of world performance/TPS. 2026-10-26.
++
++## Algorithmic complexity
++
++- `beginCalculation` uses an ordered `TreeMap` per calculation run; a new interval needs the immediate predecessor and successor: **O(log n)** in that run, with a constant-time map lookup in expectation. An additional `abandonedRuns.contains(runId)` test is expected **O(1)**.
++- `claim` uses HashMap lookups and candidate value comparison, expected **O(k)** in number of chunk revisions embedded in the candidate for its immutable read-set equality, plus expected O(1) ledger map lookups; synchronization serializes claims within the instance.
++- `abandonRun` is an **exceptional, non-hot-path operation**. It scans all settlement keys to conservatively prevent retirement of a partially or fully applied run: **O(M)** in total claimed events, while sharing the Ledger lock. Future optimization may use a per-run claimed-event count when measurements justify it; do not build a generalized transaction system now.
++- Memory grows with all registered steps, run interval indexes, settlement keys, failure reasons and abandoned-run tombstones; **no eviction**. Removing tombstones carelessly would re-enable duplicate claims. A durable lifecycle is still needed before indefinite simulated experiments.
++
++## Independent measurements on the same available machine
++
++Command: compile original checkpoint and D1 pure-Java sources under OpenJDK `21.0.12.1`, run `LedgerBenchmark` with `java -Xmx768m`, `3` repetitions per size after `3x1000` warm-up. Host: Linux amd64, 4 processors. The code and run size match, but the JVM/JIT/GC and OS introduce noise.
++
++| Metric | Incoming checkpoint | D1 |
++| --- | ---: | ---: |
++| Register 1,000 steps, median | **1.102 ms** | **0.952 ms** |
++| Register 10,000 steps, median | **7.205 ms** | **7.829 ms** |
++| Register 50,000 steps, median | **27.040 ms** | **28.173 ms** |
++| 50,000-step retention estimate | ~8.249 MiB | ~8.249 MiB |
++| 20,000 claims + markApplied | 79.266 ms | 62.900 ms |
++
++The ~1.1 ms median difference at 50,000 steps is not statistically sufficient to infer an actual regression; no meaningful structural change to the interval insertion algorithm occurred. The memory estimator forces GC and is only a rough heap delta. Raw full logs are in `verification/M0-R2.1-D1/performance/`.
++
++**Previous DeepSeek baseline** (Windows/JDK 25) reported ~15.17 ms median for 50,000 registrations after the TreeMap optimization, vs ~10,489 ms in its previous unoptimized implementation. Different host/JVM data are not directly comparable with this D1 Linux/JDK 21 probe.
++
++## Before enabling world interactions
++
++1. Establish per-server-tick budgets, TPS timings and bounded snapshots on the real NeoForge dedicated server.
++2. Add a server-owned scheduler with exclusive logical-experiment leases, abort/restart semantics and backpressure; this is not provided by the ledger.
++3. Define a durable, crash-safe acknowledgement protocol if physical effects are ever applied; today cross-restart exactly-once is NOT guaranteed.
++4. Re-test claim/abort hot paths under realistic peak numbers of chunks, entities and events, not just the small synthetic records in this benchmark.
+--- a/docs/TEST_PLAN.md
++++ b/docs/TEST_PLAN.md
+@@ -1,3 +1,26 @@
++# Director D1 addendum — 2026-10-26 (M0-R2.1, not M0 closure)
++
++**Do not treat historical M0-R2 build/JAR/runtime logs as validation of modified D1 source.**
++
++| D1 validation | Result | Evidence |
++| --- | --- | --- |
++| Original incoming checkpoint manifest | PASS | `sha256sum -c` before editing, 141/141 |
++| Pure-Java main + smoke compiled on JDK 21 | PASS | `verification/M0-R2.1-D1/logs/smoke-jdk21.log` |
++| Dependency-free Smoke, including 100 Claim/Abandon races | **PASS 363/363** | same log; three assertions per race plus prior checks |
++| Python asset tests | **PASS 17/17** | `verification/M0-R2.1-D1/logs/python-assets.log` |
++| Existing and added test methods via temporary ad-hoc JDK 21 reflection runner | **PASS 118/118** | `verification/M0-R2.1-D1/logs/offline-assertion-sweep.log`; **NOT JUnit** |
++| Formal Gradle/JUnit under JDK 25 on D1 source | **NOT RUN** | JDK 25, Gradle dependencies and NeoForge artifacts unavailable in this environment |
++| D1 NeoForge `:neoforge-mod:build` and JAR check | **NOT RUN** | same blocker; archived R2 build is historical only |
++| D1 development client and server | **NOT RUN** | no D1 build or Minecraft runtime |
++| D1 independent installed JAR | **NOT RUN** | no new release artifact built |
++| Real Blender export / client rendering | **NOT RUN** | owner 3D model absent |
++
++**New formal JUnit source:** `WorldEffectLedgerRunAbandonmentTest.java` (5 tests): run tombstone, unknown run, actual recalculation on new run, fail-closed abandonment after claim, and Claim/Abandon concurrency. Two previous tests were tightened to require a distinct run ID for actual solver reexecution. The real JUnit engine has not run this D1 test tree; run it with JDK 25 before merging or releasing.
++
++**Important semantics:** D1's run fence prevents in-memory late claims from an explicitly abandoned run, but it does not link separate run IDs to one logical experiment. It does not implement real `ServerLevel` validation, world changes, durable commit, exactly-once across restart or any laser physics.
++
++---
++
+ # M0 verification, provenance and gate status
+ 
+ **Revision:** M0-R2, 2026-10-26  
+--- a/docs/WORLD_INTERACTION_CONTRACT.md
++++ b/docs/WORLD_INTERACTION_CONTRACT.md
+@@ -1,4 +1,4 @@
+-# World interaction contract — v0.2 (M0-R2)
++# World interaction contract — v0.3 (M0-R2.1-D1)
+ 
+ **Status:** engineering contract implemented in pure Java and tests; **no Minecraft world mutation is implemented**.
+ **Owner principle:** physical apparatus *affects and is affected by* the Minecraft world.
+@@ -14,7 +14,8 @@
+ 7. Zero net absorption is not secretly mapped to heat or damage. All model-to-Minecraft conversion constants require owner approval and documentation.
+ 8. Unloaded areas must not silently receive world changes after chunk reload.
+ 9. Passing the pure precheck is **never** permission to mutate the world.
+-10. The same calculation step and the same transfer event must never be submitted, calculated or settled twice.
++10. A calculation step may be executed at most once **per run ID**, and a transfer may be claimed at most once per event key **per ledger lifetime**. A genuine rerun of an invalidated step requires explicit abandonment of an unclaimed run and a distinct server-generated run ID.
++11. A run that has already claimed any event (including APPLIED or FAILED) must never be abandoned and automatically replayed: partial or complete world effects may already exist.
+ 
+ ## Pipeline and ownership
+ 
+@@ -26,11 +27,11 @@
+     -> EnergyTransferCandidate(event index, device/target snapshots, full WorldReadSet)
+     -> WorldEffectGate.precheck        (pure, read-only, no mutation authority)
+     -> fresh server target/device/load/permission facts
+-    -> WorldEffectLedger.claim         (exactly-once event claim)
++    -> WorldEffectLedger.claim         (single claim per event key, in memory)
+     -> [FUTURE] NeoForge server adapter mutation on the server thread
+ ```
+ 
+-No stage after `claim` exists in M0-R2. There is no laser, no damage, no heating and no block mutation.
++No production mutation stage after `claim` exists in M0-R2.1-D1. There is no implemented laser, damage, heating or block mutation.
+ 
+ ## C1 — calculation steps, intervals and transfer events
+ 
+@@ -46,6 +47,15 @@
+ - The ledger is in-memory only. A new server process starts with `UNCLAIMED` state: **cross-restart exactly-once is NOT implemented or guaranteed**. A durable claim committed atomically with the world mutation is future work.
+ - A chunk/device/target unload makes the precheck fail; no claim should be made. The final server adapter must also re-check load state immediately before mutation.
+ - Tests use only the Minecraft-free `FakeWorldState` test double, terminal-outcome tests, an explicit restart-limitation test, and a 16-thread concurrent claim test. Exactly one concurrent claim wins.
++
++## C1.1 — Explicit stale-run abandonment (D1)
++
++- The authoritative scheduler may mark an **unclaimed** calculation run stale by calling `WorldEffectLedger.abandonRun(oldRunId)` **after** its server-state check rejects a result and **before** re-running the solver.
++- The method is synchronized with `claim` and returns `ABANDONED` only for an existing run with **zero settlement claims**. This is conservative: an event marked `FAILED` may have partially affected the world, so any claimed outcome prevents abandoning the run.
++- After success, existing registered steps remain reserved as tombstones. `beginCalculation` returns `RUN_ABANDONED` and `claim` returns `RUN_ABANDONED`; `ServerEffectCommitCoordinator` maps the latter to `Decision.RUN_ABANDONED`.
++- A **new server-issued calculationRunId** is required for the next actual solver execution. Same-run rechecking a cached candidate is not equivalent to executing the solver again.
++- This is an **in-process run fence only**. A production scheduler must also serialize replacement attempts belonging to the same logical experiment. Nothing prevents an unrelated caller from starting an arbitrary second run whose physical interval overlaps a run with already-claimed effects.
++- Abandonment and claim are mutually exclusive within a single ledger instance. Across restarts, run status is lost. A durable server-state protocol remains future work.
+ 
+ ## C2 — stale results, load state and version data
+ 
+@@ -82,10 +92,12 @@
+ 
+ | Item | Status | Evidence |
+ | --- | --- | --- |
+-| Pure-Java candidate/read-set/device/target validation | PASS | JUnit + 46 standalone checks |
+-| Duplicate step/event prevention | PASS | `WorldEffectLedgerTest`, concurrent claim test |
++| Pure-Java candidate/read-set/device/target validation | PASS for checkpoint | Previous R2.1 XML + D1 363-check Java smoke |
++| Duplicate step/event prevention and unclaimed run retirement | PASS in D1 offline checks | 100 Claim/Abandon races; added `WorldEffectLedgerRunAbandonmentTest` for JDK 25 JUnit follow-up |
+ | Precheck cannot mutate | PASS | no mutation API; structural test |
+ | Server permission/target adapter | NOT IMPLEMENTED | interface contract only |
+ | Persistent cross-restart ledger | NOT IMPLEMENTED | documented limitation |
+ | NeoForge world-change tracking | NOT IMPLEMENTED | documented limitation |
+ | Actual laser/world effects | NOT IMPLEMENTED | requires owner-approved models |
++
++**D1 verification scope:** independent Linux JDK 21 Smoke 363/363 and Python 17/17 are PASS; independent temporary reflection assertion runner executed 118 existing/new test methods without the JUnit engine. Formal JDK 25/JUnit/NeoForge and installed-JAR tests on the D1 tree are **NOT RUN**, not PASS. Previous XML/build/runtime results belong to their earlier trees.
+--- a/experiment-core/src/main/java/dev/coldatomcraft/experiment/world/ServerEffectCommitCoordinator.java
++++ b/experiment-core/src/main/java/dev/coldatomcraft/experiment/world/ServerEffectCommitCoordinator.java
+@@ -34,6 +34,7 @@
+         PRECHECK_CANDIDATE_MISMATCH,
+         MODEL_NOT_TRUSTED,
+         SERVER_REVALIDATION_FAILED,
++        RUN_ABANDONED,
+         LEDGER_REJECTED
+     }
+ 
+@@ -92,8 +93,12 @@
+         }
+ 
+         WorldEffectLedger.ClaimResult claim = ledger.claim(candidate, precheck);
+-        return claim == WorldEffectLedger.ClaimResult.CLAIMED
+-                ? Decision.SETTLEMENT_CLAIMED
+-                : Decision.LEDGER_REJECTED;
++        if (claim == WorldEffectLedger.ClaimResult.CLAIMED) {
++            return Decision.SETTLEMENT_CLAIMED;
++        }
++        if (claim == WorldEffectLedger.ClaimResult.RUN_ABANDONED) {
++            return Decision.RUN_ABANDONED;
++        }
++        return Decision.LEDGER_REJECTED;
+     }
+ }
+--- a/experiment-core/src/main/java/dev/coldatomcraft/experiment/world/WorldEffectLedger.java
++++ b/experiment-core/src/main/java/dev/coldatomcraft/experiment/world/WorldEffectLedger.java
+@@ -1,15 +1,17 @@
+ package dev.coldatomcraft.experiment.world;
+ 
+ import java.util.HashMap;
++import java.util.HashSet;
+ import java.util.Map;
+ import java.util.NavigableMap;
+ import java.util.Optional;
++import java.util.Set;
+ import java.util.TreeMap;
+ 
+ /**
+  * In-memory, fail-closed accounting for calculation steps and transfer events.
+  *
+- * <p>Two independent duplicate risks are handled:</p>
++ * <p>Two independent duplicate risks are handled **within this in-memory ledger instance**:</p>
+  * <ul>
+  *   <li>{@link #beginCalculation(CalculationStep)} reserves a step identity and
+  *       rejects a second execution, including a different step index covering an
+@@ -43,6 +45,7 @@
+         STARTED,
+         DUPLICATE_STEP,
+         OVERLAPPING_INTERVAL,
++        RUN_ABANDONED,
+         INVALID
+     }
+ 
+@@ -53,6 +56,20 @@
+         PRECHECK_REQUIRED,
+         PRECHECK_CANDIDATE_MISMATCH,
+         STEP_INTERVAL_MISMATCH,
++        RUN_ABANDONED,
++        INVALID
++    }
++
++    /**
++     * Abandoning a stale solver run is permitted only while no event has been
++     * claimed. Once a claim exists, a world mutation may already have happened
++     * and the run cannot safely be replaced using this in-memory ledger alone.
++     */
++    public enum AbandonResult {
++        ABANDONED,
++        ALREADY_ABANDONED,
++        UNKNOWN_RUN,
++        HAS_SETTLEMENT_CLAIMS,
+         INVALID
+     }
+ 
+@@ -64,6 +81,7 @@
+     }
+ 
+     private final Map<StepKey, SimulationInterval> calculations = new HashMap<>();
++    private final Set<String> abandonedRuns = new HashSet<>();
+     private final Map<String, NavigableMap<Long, SimulationInterval>> intervalsByRun = new HashMap<>();
+     private final Map<TransferEventKey, SettlementState> settlements = new HashMap<>();
+     private final Map<TransferEventKey, String> failureReasons = new HashMap<>();
+@@ -81,6 +99,9 @@
+     public synchronized BeginResult beginCalculation(CalculationStep step) {
+         if (step == null) {
+             return BeginResult.INVALID;
++        }
++        if (abandonedRuns.contains(step.calculationRunId())) {
++            return BeginResult.RUN_ABANDONED;
+         }
+         StepKey key = new StepKey(step.calculationRunId(), step.stepIndex());
+         if (calculations.containsKey(key)) {
+@@ -134,6 +155,9 @@
+         if (registeredInterval == null) {
+             return ClaimResult.UNREGISTERED_CALCULATION;
+         }
++        if (abandonedRuns.contains(candidate.step().calculationRunId())) {
++            return ClaimResult.RUN_ABANDONED;
++        }
+         // An already-settled event remains a duplicate regardless of any later
+         // payload edit, even if that edit would also fail step validation.
+         if (settlements.containsKey(candidate.eventKey())) {
+@@ -147,6 +171,53 @@
+     }
+ 
+     /**
++     * Retires a solver run whose snapshots became stale BEFORE any event was
++     * claimed. Existing step and run identities remain reserved as tombstones;
++     * no late result from the abandoned run can subsequently be claimed.
++     *
++     * <p>The authoritative experiment scheduler must allocate a DIFFERENT,
++     * server-owned run ID to recompute the stale simulation interval. This method
++     * is not a general cancellation of previously committed world effects. A run
++     * containing even one CLAIMED/APPLIED/FAILED event is conservatively refused
++     * because an effect may have been applied already.</p>
++     *
++     * <p>Synchronization with {@link #claim} prevents an in-process race between
++     * abandonment and claiming: at most one of them can succeed. The ledger
++     * cannot prevent an unrelated scheduler from creating a different run ID
++     * representing a previously applied world effect, so the production scheduler
++     * MUST serialize retries for the same physical experiment.</p>
++     *
++     * <p>In-memory limitation: no restart-safe cancellation/tombstone guarantee.</p>
++     */
++    public synchronized AbandonResult abandonRun(String calculationRunId) {
++        if (calculationRunId == null || calculationRunId.isBlank()) {
++            return AbandonResult.INVALID;
++        }
++        if (abandonedRuns.contains(calculationRunId)) {
++            return AbandonResult.ALREADY_ABANDONED;
++        }
++        if (!intervalsByRun.containsKey(calculationRunId)) {
++            return AbandonResult.UNKNOWN_RUN;
++        }
++        // This is intentionally conservative: a FAILED claim might have partially
++        // mutated the world, and an APPLIED one certainly could have. The scan is
++        // O(number of event claims), but abandonment is an exceptional path, not
++        // part of per-tick or per-event hot-path processing.
++        for (TransferEventKey key : settlements.keySet()) {
++            if (calculationRunId.equals(key.calculationRunId())) {
++                return AbandonResult.HAS_SETTLEMENT_CLAIMS;
++            }
++        }
++        abandonedRuns.add(calculationRunId);
++        return AbandonResult.ABANDONED;
++    }
++
++    /** True only for a run explicitly retired without any settlement claim. */
++    public synchronized boolean isRunAbandoned(String calculationRunId) {
++        return calculationRunId != null && abandonedRuns.contains(calculationRunId);
++    }
++
++    /**
+      * Records successful application. Only a currently {@code CLAIMED} event can
+      * transition. Repeat or out-of-order outcome records are rejected.
+      */
+--- a/experiment-core/src/test/java/dev/coldatomcraft/experiment/world/PrecheckCandidateBindingTest.java
++++ b/experiment-core/src/test/java/dev/coldatomcraft/experiment/world/PrecheckCandidateBindingTest.java
+@@ -208,10 +208,16 @@
+                 ledger.claim(candidate, stalePrecheck));
+         assertFalse(ledger.isTransferClaimed(candidate.eventKey()));
+ 
+-        // A new authoritative snapshot (represented by a fresh fixture) allows
+-        // the same event identity to claim once.
++        // The prior solver run must be abandoned before rerunning physics.
++        assertEquals(WorldEffectLedger.AbandonResult.ABANDONED,
++                ledger.abandonRun(STEP.calculationRunId()));
+         FakeWorldState recalculatedWorld = new FakeWorldState();
+-        var recalculated = candidate(recalculatedWorld, STEP, 0);
++        var staleRunCandidate = candidate(recalculatedWorld, STEP, 0);
++        assertEquals(WorldEffectLedger.ClaimResult.RUN_ABANDONED,
++                ledger.claim(staleRunCandidate, precheck(recalculatedWorld, staleRunCandidate)));
++        var newStep = new CalculationStep("run-2", 0, STEP.interval());
++        assertEquals(WorldEffectLedger.BeginResult.STARTED, ledger.beginCalculation(newStep));
++        var recalculated = candidate(recalculatedWorld, newStep, 0);
+         assertEquals(WorldEffectLedger.ClaimResult.CLAIMED,
+                 ledger.claim(recalculated, precheck(recalculatedWorld, recalculated)));
+     }
+--- a/experiment-core/src/test/java/dev/coldatomcraft/experiment/world/ServerEffectCommitCoordinatorTest.java
++++ b/experiment-core/src/test/java/dev/coldatomcraft/experiment/world/ServerEffectCommitCoordinatorTest.java
+@@ -147,19 +147,31 @@
+     }
+ 
+     @Test
+-    void staleRejectionDoesNotBlockFreshRecalculationOfSameEvent() {
++    void staleRejectionRequiresNewServerRunForActualSolverReexecution() {
+         Fixture f = fixture(null);
+         f.world().changeMirrorContent();
+         assertEquals(ServerEffectCommitCoordinator.Decision.SERVER_REVALIDATION_FAILED,
+                 f.coordinator().submit(f.candidate(), f.precheck(), f.world().snapshot(), ALL_SERVER_FACTS));
+         assertFalse(f.ledger().isTransferClaimed(f.candidate().eventKey()));
+-
+-        var recalculated = candidate(f.world(), STEP, 0);
+-        var freshPrecheck = precheck(f.world(), recalculated);
+-        assertEquals(f.candidate().eventKey(), recalculated.eventKey());
++        assertEquals(WorldEffectLedger.AbandonResult.ABANDONED,
++                f.ledger().abandonRun(STEP.calculationRunId()));
++
++        // Re-running the physical solver requires an independent server-owned run ID.
++        // A refreshed candidate under the retired ID is deliberately rejected.
++        var lateOldRun = candidate(f.world(), STEP, 0);
++        assertEquals(ServerEffectCommitCoordinator.Decision.RUN_ABANDONED,
++                f.coordinator().submit(lateOldRun, precheck(f.world(), lateOldRun),
++                        f.world().snapshot(), ALL_SERVER_FACTS));
++
++        var replacementStep = new CalculationStep("run-2", 0, STEP.interval());
++        assertEquals(WorldEffectLedger.BeginResult.STARTED,
++                f.ledger().beginCalculation(replacementStep));
++        var recalculated = candidate(f.world(), replacementStep, 0);
+         assertEquals(ServerEffectCommitCoordinator.Decision.SETTLEMENT_CLAIMED,
+-                f.coordinator().submit(recalculated, freshPrecheck,
+-                        f.world().snapshot(), ALL_SERVER_FACTS));
++                f.coordinator().submit(recalculated, precheck(f.world(), recalculated),
++                        f.world().snapshot(), ALL_SERVER_FACTS));
++        assertEquals(WorldEffectLedger.SettlementState.UNCLAIMED,
++                f.ledger().stateOf(f.candidate().eventKey()));
+     }
+ 
+     @Test
+--- /dev/null
++++ b/experiment-core/src/test/java/dev/coldatomcraft/experiment/world/WorldEffectLedgerRunAbandonmentTest.java
+@@ -0,0 +1,157 @@
++package dev.coldatomcraft.experiment.world;
++
++import org.junit.jupiter.api.Test;
++
++import java.util.concurrent.Callable;
++import java.util.concurrent.CountDownLatch;
++import java.util.concurrent.Executors;
++import java.util.concurrent.TimeUnit;
++
++import static dev.coldatomcraft.experiment.world.ContractTestSupport.STEP;
++import static dev.coldatomcraft.experiment.world.ContractTestSupport.candidate;
++import static dev.coldatomcraft.experiment.world.ContractTestSupport.precheck;
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assertions.assertFalse;
++import static org.junit.jupiter.api.Assertions.assertTrue;
++
++/**
++ * M0-R2.1-D1: retiring a stale calculation run must not make late results
++ * claimable, and no run with a claimed (possibly applied) effect may be retired.
++ * Tests use a synthetic owner-approved model fixture; no production physics.
++ */
++class WorldEffectLedgerRunAbandonmentTest {
++    @Test
++    void unknownAndInvalidRunCannotCreateAnAbandonedTombstone() {
++        var ledger = new WorldEffectLedger();
++        assertEquals(WorldEffectLedger.AbandonResult.INVALID, ledger.abandonRun(null));
++        assertEquals(WorldEffectLedger.AbandonResult.INVALID, ledger.abandonRun("  "));
++        assertEquals(WorldEffectLedger.AbandonResult.UNKNOWN_RUN, ledger.abandonRun("future-run"));
++        assertFalse(ledger.isRunAbandoned("future-run"));
++        assertEquals(WorldEffectLedger.BeginResult.STARTED, ledger.beginCalculation(
++                new CalculationStep("future-run", 0, new SimulationInterval(0, 1_000))));
++    }
++
++    @Test
++    void abandonedRunCannotRestartStepOrClaimLateResult() {
++        FakeWorldState world = new FakeWorldState();
++        var ledger = new WorldEffectLedger();
++        assertEquals(WorldEffectLedger.BeginResult.STARTED, ledger.beginCalculation(STEP));
++        var oldCandidate = candidate(world, STEP, 0);
++        var oldPrecheck = precheck(world, oldCandidate);
++        assertTrue(oldPrecheck.allowed());
++
++        assertEquals(WorldEffectLedger.AbandonResult.ABANDONED, ledger.abandonRun("run-1"));
++        assertTrue(ledger.isRunAbandoned("run-1"));
++        assertEquals(WorldEffectLedger.AbandonResult.ALREADY_ABANDONED, ledger.abandonRun("run-1"));
++        assertEquals(WorldEffectLedger.BeginResult.RUN_ABANDONED, ledger.beginCalculation(STEP));
++        assertEquals(WorldEffectLedger.BeginResult.RUN_ABANDONED, ledger.beginCalculation(
++                new CalculationStep("run-1", 1, new SimulationInterval(1_000, 2_000))));
++        assertEquals(WorldEffectLedger.ClaimResult.RUN_ABANDONED,
++                ledger.claim(oldCandidate, oldPrecheck));
++        assertEquals(WorldEffectLedger.SettlementState.UNCLAIMED,
++                ledger.stateOf(oldCandidate.eventKey()));
++    }
++
++    @Test
++    void staleResultMayBeRecomputedOnlyInAReplacementRun() {
++        FakeWorldState world = new FakeWorldState();
++        var ledger = new WorldEffectLedger();
++        assertEquals(WorldEffectLedger.BeginResult.STARTED, ledger.beginCalculation(STEP));
++        var oldCandidate = candidate(world, STEP, 0);
++        var oldPrecheck = precheck(world, oldCandidate);
++
++        // World changed while the solver was running: old submission is stale.
++        world.changeMirrorContent();
++        var coordinator = new ServerEffectCommitCoordinator(
++                ledger, ContractTestSupport.TEST_MODEL_CATALOG);
++        assertEquals(ServerEffectCommitCoordinator.Decision.SERVER_REVALIDATION_FAILED,
++                coordinator.submit(oldCandidate, oldPrecheck,
++                        world.snapshot(), ContractTestSupport.ALL_SERVER_FACTS));
++        assertEquals(WorldEffectLedger.AbandonResult.ABANDONED, ledger.abandonRun("run-1"));
++
++        // No second calculation may reuse run-1. A trusted scheduler must issue
++        // a new run ID; the same simulated time interval is valid across runs.
++        // An otherwise fresh candidate must still be rejected by the final
++        // coordinator once its server-owned calculation run was abandoned.
++        var sameRunCandidate = candidate(world, STEP, 0);
++        assertEquals(ServerEffectCommitCoordinator.Decision.RUN_ABANDONED,
++                coordinator.submit(sameRunCandidate, precheck(world, sameRunCandidate),
++                        world.snapshot(), ContractTestSupport.ALL_SERVER_FACTS));
++
++        var newStep = new CalculationStep("run-2", 0, STEP.interval());
++        assertEquals(WorldEffectLedger.BeginResult.STARTED, ledger.beginCalculation(newStep));
++        var recomputed = candidate(world, newStep, 0);
++        assertEquals(ServerEffectCommitCoordinator.Decision.SETTLEMENT_CLAIMED,
++                coordinator.submit(recomputed, precheck(world, recomputed),
++                        world.snapshot(), ContractTestSupport.ALL_SERVER_FACTS));
++        assertEquals(WorldEffectLedger.ClaimResult.RUN_ABANDONED,
++                ledger.claim(oldCandidate, oldPrecheck));
++        assertEquals(WorldEffectLedger.SettlementState.UNCLAIMED,
++                ledger.stateOf(oldCandidate.eventKey()));
++        assertEquals(WorldEffectLedger.SettlementState.CLAIMED,
++                ledger.stateOf(recomputed.eventKey()));
++    }
++
++    @Test
++    void claimedRunCannotBeAbandonedEvenAfterTerminalOutcome() {
++        for (WorldEffectLedger.SettlementState terminal : new WorldEffectLedger.SettlementState[] {
++                WorldEffectLedger.SettlementState.CLAIMED,
++                WorldEffectLedger.SettlementState.APPLIED,
++                WorldEffectLedger.SettlementState.FAILED }) {
++            var world = new FakeWorldState();
++            var ledger = new WorldEffectLedger();
++            assertEquals(WorldEffectLedger.BeginResult.STARTED, ledger.beginCalculation(STEP));
++            var transfer = candidate(world, STEP, 0);
++            assertEquals(WorldEffectLedger.ClaimResult.CLAIMED,
++                    ledger.claim(transfer, precheck(world, transfer)));
++            if (terminal == WorldEffectLedger.SettlementState.APPLIED) {
++                assertTrue(ledger.markApplied(transfer.eventKey()));
++            } else if (terminal == WorldEffectLedger.SettlementState.FAILED) {
++                assertTrue(ledger.markFailed(transfer.eventKey(), "possible partial effect"));
++            }
++            assertEquals(WorldEffectLedger.AbandonResult.HAS_SETTLEMENT_CLAIMS,
++                    ledger.abandonRun("run-1"));
++            assertFalse(ledger.isRunAbandoned("run-1"));
++            assertEquals(terminal, ledger.stateOf(transfer.eventKey()));
++        }
++    }
++
++    @Test
++    void concurrentClaimAndAbandonmentCannotBothSucceed() throws Exception {
++        var world = new FakeWorldState();
++        var ledger = new WorldEffectLedger();
++        assertEquals(WorldEffectLedger.BeginResult.STARTED, ledger.beginCalculation(STEP));
++        var transfer = candidate(world, STEP, 0);
++        var check = precheck(world, transfer);
++        var ready = new CountDownLatch(2);
++        var start = new CountDownLatch(1);
++        var executor = Executors.newFixedThreadPool(2);
++        try {
++            Callable<WorldEffectLedger.ClaimResult> claim = () -> {
++                ready.countDown();
++                if (!start.await(10, TimeUnit.SECONDS)) throw new AssertionError("claim start timeout");
++                return ledger.claim(transfer, check);
++            };
++            Callable<WorldEffectLedger.AbandonResult> abandon = () -> {
++                ready.countDown();
++                if (!start.await(10, TimeUnit.SECONDS)) throw new AssertionError("abandon start timeout");
++                return ledger.abandonRun("run-1");
++            };
++            var claimFuture = executor.submit(claim);
++            var abandonFuture = executor.submit(abandon);
++            assertTrue(ready.await(10, TimeUnit.SECONDS));
++            start.countDown();
++            var claimResult = claimFuture.get(10, TimeUnit.SECONDS);
++            var abandonResult = abandonFuture.get(10, TimeUnit.SECONDS);
++            assertTrue(
++                    (claimResult == WorldEffectLedger.ClaimResult.CLAIMED
++                            && abandonResult == WorldEffectLedger.AbandonResult.HAS_SETTLEMENT_CLAIMS)
++                    || (claimResult == WorldEffectLedger.ClaimResult.RUN_ABANDONED
++                            && abandonResult == WorldEffectLedger.AbandonResult.ABANDONED));
++        } finally {
++            start.countDown();
++            executor.shutdownNow();
++            assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
++        }
++    }
++}
+--- a/verification/Smoke.java
++++ b/verification/Smoke.java
+@@ -27,6 +27,9 @@
+ import dev.coldatomcraft.experiment.world.WorldReadSet;
+ import dev.coldatomcraft.experiment.world.WorldRevision;
+ import java.util.List;
++import java.util.concurrent.CountDownLatch;
++import java.util.concurrent.Executors;
++import java.util.concurrent.TimeUnit;
+ 
+ /** Dependency-free engineering checks: these are not tests of a laser model. */
+ public final class Smoke {
+@@ -51,7 +54,7 @@
+         check(rejected, label);
+     }
+ 
+-    public static void main(String[] args) {
++    public static void main(String[] args) throws Exception {
+         Vec3 unit = new Vec3(3, 4, 0).normalized();
+         near(unit.magnitude(), 1, 1e-12, "unit length");
+         near(unit.dot(new Vec3(0, 1, 0)), 0.8, 1e-12, "dot");
+@@ -207,6 +210,76 @@
+                         == ServerEffectCommitCoordinator.Decision.MODEL_NOT_TRUSTED,
+                 "empty trusted catalog fails closed");
+ 
++        // M0-R2.1-D1: explicit run abandonment prevents late stale results.
++        var abortStep = new CalculationStep("run-abandoned", 0, new SimulationInterval(0, 500));
++        var abortLedger = new WorldEffectLedger();
++        check(abortLedger.beginCalculation(abortStep) == WorldEffectLedger.BeginResult.STARTED,
++                "abandonment test run started");
++        var abortCandidate = new EnergyTransferCandidate("THM-001", "A", device, target,
++                1.5, abortStep, 0, readSet);
++        var abortCheck = WorldEffectGate.precheck(abortCandidate, verified, readSet, device, target);
++        check(abortLedger.abandonRun("run-abandoned") == WorldEffectLedger.AbandonResult.ABANDONED,
++                "unclaimed run can be abandoned");
++        check(abortLedger.isRunAbandoned("run-abandoned"), "abandoned run is recorded");
++        check(abortLedger.beginCalculation(abortStep) == WorldEffectLedger.BeginResult.RUN_ABANDONED,
++                "abandoned step cannot restart");
++        check(abortLedger.claim(abortCandidate, abortCheck) == WorldEffectLedger.ClaimResult.RUN_ABANDONED,
++                "late abandoned candidate cannot claim");
++        var replacementStep = new CalculationStep("new-server-run", 0, abortStep.interval());
++        check(abortLedger.beginCalculation(replacementStep) == WorldEffectLedger.BeginResult.STARTED,
++                "new run may reserve same time interval");
++        var replacement = new EnergyTransferCandidate("THM-001", "A", device, target,
++                1.5, replacementStep, 0, readSet);
++        var replacementPrecheck = WorldEffectGate.precheck(replacement, verified, readSet, device, target);
++        check(abortLedger.claim(replacement, replacementPrecheck) == WorldEffectLedger.ClaimResult.CLAIMED,
++                "fresh run can claim");
++        check(abortLedger.abandonRun("new-server-run")
++                        == WorldEffectLedger.AbandonResult.HAS_SETTLEMENT_CLAIMS,
++                "run with claimed effects cannot be abandoned");
++
++        // Repeated two-thread arbitration: no run may be both abandoned AND
++        // permitted to claim an effect. This stress probe is not a formal
++        // concurrency proof; the corresponding JUnit test is also retained.
++        var racePool = Executors.newFixedThreadPool(2);
++        try {
++            for (int index = 0; index < 100; index++) {
++                var raceStep = new CalculationStep("race-" + index, 0,
++                        new SimulationInterval(0, 1_000));
++                var raceLedger = new WorldEffectLedger();
++                check(raceLedger.beginCalculation(raceStep) == WorldEffectLedger.BeginResult.STARTED,
++                        "race test reserved step " + index);
++                var raceCandidate = new EnergyTransferCandidate("THM-001", "A", device, target,
++                        1.5, raceStep, 0, readSet);
++                var raceCheck = WorldEffectGate.precheck(raceCandidate, verified,
++                        readSet, device, target);
++                var ready = new CountDownLatch(2);
++                var start = new CountDownLatch(1);
++                var claimJob = racePool.submit(() -> {
++                    ready.countDown();
++                    if (!start.await(5, TimeUnit.SECONDS)) throw new AssertionError("claim timed out");
++                    return raceLedger.claim(raceCandidate, raceCheck);
++                });
++                var abortJob = racePool.submit(() -> {
++                    ready.countDown();
++                    if (!start.await(5, TimeUnit.SECONDS)) throw new AssertionError("abort timed out");
++                    return raceLedger.abandonRun(raceStep.calculationRunId());
++                });
++                check(ready.await(5, TimeUnit.SECONDS), "both contenders started " + index);
++                start.countDown();
++                var claimStatus = claimJob.get(5, TimeUnit.SECONDS);
++                var abortStatus = abortJob.get(5, TimeUnit.SECONDS);
++                check((claimStatus == WorldEffectLedger.ClaimResult.CLAIMED
++                        && abortStatus == WorldEffectLedger.AbandonResult.HAS_SETTLEMENT_CLAIMS)
++                        || (claimStatus == WorldEffectLedger.ClaimResult.RUN_ABANDONED
++                        && abortStatus == WorldEffectLedger.AbandonResult.ABANDONED),
++                        "only one race operation succeeds " + index);
++            }
++        } finally {
++            racePool.shutdownNow();
++            check(racePool.awaitTermination(5, TimeUnit.SECONDS),
++                    "race test executor terminates");
++        }
++
+         System.out.println("PASS: " + checked + " standalone engineering checks; no physics models claimed");
+     }
+ }

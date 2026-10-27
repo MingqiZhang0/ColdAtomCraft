@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="dev.coldatomcraft.experiment.world.DevicePlacementTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-26T06:46:49.107Z" hostname="DESKTOP-A4M7O81" time="0.016">
+  <properties/>
+  <testcase name="gltfConversionMatchesBlenderConversionForAllFacings()" classname="dev.coldatomcraft.experiment.world.DevicePlacementTest" time="0.006"/>
+  <testcase name="scaleHasUnitsAndRejectsInvalidValues()" classname="dev.coldatomcraft.experiment.world.DevicePlacementTest" time="0.001"/>
+  <testcase name="basePivotIsOnGroundNotInBlockCenter()" classname="dev.coldatomcraft.experiment.world.DevicePlacementTest" time="0.001"/>
+  <testcase name="blenderForwardMapsToEveryCardinalFacing()" classname="dev.coldatomcraft.experiment.world.DevicePlacementTest" time="0.002"/>
+  <testcase name="transformationHasPositiveDeterminantAndPreservesDistances()" classname="dev.coldatomcraft.experiment.world.DevicePlacementTest" time="0.001"/>
+  <testcase name="opticalAnchorUsesBasePivotAndDeviceScale()" classname="dev.coldatomcraft.experiment.world.DevicePlacementTest" time="0.001"/>
+  <testcase name="gltfYUpForwardIsPositiveZAndIsNotRotatedTwice()" classname="dev.coldatomcraft.experiment.world.DevicePlacementTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

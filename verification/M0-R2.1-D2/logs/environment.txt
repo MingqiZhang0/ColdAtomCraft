@@ -1,0 +1,7 @@
+verified_at_utc=2026-10-26T12:03:36Z
+Linux 6.18.55 x86_64
+openjdk version "21.0.12.1" 2026-08-18
+OpenJDK Runtime Environment (build 21.0.12.1+1-1-deb13u1-Debian)
+OpenJDK 64-Bit Server VM (build 21.0.12.1+1-1-deb13u1-Debian, mixed mode, sharing)
+javac 21.0.12.1
+CURRENT_JDK25_AND_NEOFORGE_BUILD=NOT_RUN (not present; external Maven and Gradle hosts DNS unavailable)

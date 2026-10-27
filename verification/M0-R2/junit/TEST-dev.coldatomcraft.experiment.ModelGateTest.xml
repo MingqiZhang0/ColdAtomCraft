@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="dev.coldatomcraft.experiment.ModelGateTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-26T06:46:49.098Z" hostname="DESKTOP-A4M7O81" time="0.006">
+  <properties/>
+  <testcase name="draftCannotClaimVerifiedAndApprovalNeedsTraceableReference()" classname="dev.coldatomcraft.experiment.ModelGateTest" time="0.002"/>
+  <testcase name="serverCatalogResolutionProducesOnlyTheRecordedApprovalState()" classname="dev.coldatomcraft.experiment.ModelGateTest" time="0.001"/>
+  <testcase name="ownerApprovalAndEngineeringVerificationAreIndependent()" classname="dev.coldatomcraft.experiment.ModelGateTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,15 @@
+{
+  "itemGroup.coldatomcraft.lab_preview": "CAC Diagnostic Lab (DEV)",
+  "block.coldatomcraft.diagnostic_laser": "Diagnostic Laser (Placeholder)",
+  "block.coldatomcraft.diagnostic_power_meter": "Diagnostic Power Meter (Placeholder)",
+  "message.coldatomcraft.preview.laser_rotated": "[CAC DEV] Laser points %s",
+  "message.coldatomcraft.preview.laser_on": "[CAC DEV] Laser shutter OPEN (test preset)",
+  "message.coldatomcraft.preview.laser_off": "[CAC DEV] Laser shutter CLOSED",
+  "message.coldatomcraft.preview.aperture": "[CAC DEV] Aperture radius: %s mm",
+  "message.coldatomcraft.preview.reading": "[CAC DEV] Ideal power: %s mW (distance %s blocks)",
+  "message.coldatomcraft.preview.no_source": "[CAC DEV] No diagnostic source in front (24 blocks)",
+  "message.coldatomcraft.preview.blocked": "[CAC DEV] Optical route blocked by a non-air block",
+  "message.coldatomcraft.preview.unloaded": "[CAC DEV] Optical route enters an unloaded chunk",
+  "message.coldatomcraft.preview.wrong_facing": "[CAC DEV] Source output points the wrong way",
+  "message.coldatomcraft.preview.shutter_closed": "[CAC DEV] Source found, shutter is closed"
+}

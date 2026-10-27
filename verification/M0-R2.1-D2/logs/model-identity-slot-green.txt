@@ -1,0 +1,3 @@
+A: CLAIMED
+B: DUPLICATE_TRANSFER
+Claim count: 1

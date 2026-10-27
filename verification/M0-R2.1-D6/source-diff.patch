@@ -1,0 +1,1555 @@
+--- D5/README.md
++++ D6/README.md
+@@ -1,3 +1,38 @@
++# Cold Atom Craft — M0-R2.1-D6 Complex-field and Jones optics reference (2026-10-26)
++
++**Two separate Gate statuses:** M0 NeoForge build/runtime for **D6** remains
++**BLOCKED/NOT RUN** on this JDK21/offline host; D6 adds a dependency-free
++scientific **DRAFT REFERENCE**, not an Owner-approved model, a Blender asset,
++or a playable laser.
++
++D6 expands the D5 Gaussian optics reference into **complex phasor/Jones
++polarization, ideal waveplates/polarizers, coherent/phase-incoherent field
++superposition, standing-wave Gouy-phase effects, and separate electric vs
++magnetic cycle-averaged energy and leading-order paraxial Poynting flux**.
++These are optical field *observables*, not a material-absorption model or a
++world energy mutation API. No `ModelCatalog` production approval is changed.
++
++**New validation:** 23 JUnit-source test methods (194 total in a **NON-JUNIT**
++reflection runner), 19 standalone D6 smoke checks, **39 independent 70-digit
++Decimal scalar comparisons**, retaining all 36 D5 independent 80-digit checks.
++The previously audited 383 engineering smoke tests and 30 Python engineering
++tests remain; see the [scientific reference](docs/OPT_001_COMPLEX_FIELD_REFERENCE.md)
++and [D6 director audit](docs/M0_R2_1_D6_AUDIT.md).
++
++```shell
++bash verification/M0-R2.1-D6/run_d6_offline.sh
++# Formal JDK25/Gradle/JUnit/JAR gate (on a machine with dependencies):
++python tools/verify_m0.py
++```
++
++**No phase-accurate interferometer after arbitrary ABCD optics is implied.**
++The branch geometry, phase reference and actual source/optical element path
++must be supplied by the future experiment hardware model. Do not infer input
++energy conservation from superposing arbitrary beam phasors: a real interferometer
++requires the other output ports and optical boundary conditions.
++
++---
++
+ # Cold Atom Craft — M0-R2.1-D5 OPT-001 optics reference (2026-10-26)
+ 
+ **Two separate statuses:** (1) D4 M0 NeoForge build/runtime Gate remains **BLOCKED/NOT RUN** on this JDK21 offline host; (2) D5 adds a **draft physical calculation reference**, not a new playable laser or an Owner-approved production model.
+--- D5/docs/ARCHITECTURE.md
++++ D6/docs/ARCHITECTURE.md
+@@ -132,3 +132,17 @@
+ `WorldEffectLedger.abandonRun(runId)` is a deliberately small pure-Java fence for stale, **unclaimed** calculation runs. It returns `ABANDONED`, `ALREADY_ABANDONED`, `UNKNOWN_RUN`, `HAS_SETTLEMENT_CLAIMS`, or `INVALID`. The aborted run identity and all its step tombstones remain in memory. `beginCalculation` and `claim` both reject this run ID. `ServerEffectCommitCoordinator` surfaces this as `RUN_ABANDONED` after current server-state revalidation.
+ 
+ Synchronization prevents a same-ledger race between claiming an event and retiring its run. **It does not bind separate run IDs to the same logical experiment**, prevent an external scheduler from reusing a physical interval after successful world mutation, persist tombstones after restart, or close the final NeoForge TOCTOU window. These remain requirements of the future server-owned scheduling and mutation adapter. See `docs/WORLD_INTERACTION_CONTRACT.md`.
++
++
++## D6 pure-Java optical reference extension
++
++`physics-core/optics` now holds reference-only `ComplexAmplitude`, `JonesVector`,
++`JonesMatrix`, `JonesGaussianBeam`, `VectorFieldPhasor` and `CoherentOptics`.
++These compute fully polarized, monochromatic, locally paraxial electric phasors,
++separate coherent-vs-incoherent combinations and distinguish electric energy
++density, magnetic energy density and leading-order Poynting transport.
++They are **not** `WorldEffectCandidate` producers and have no NeoForge,
++server/client or permission dependency. D5 `GaussianPlane` q/ABCD transfer is
++still independent from the new physical-path phase references; no automatic
++interferometer lens-path propagation or source-to-world adapter exists.
++See `OPT_001_COMPLEX_FIELD_REFERENCE.md`.
+--- D5/docs/CHANGED_FILES.md
++++ D6/docs/CHANGED_FILES.md
+@@ -117,3 +117,19 @@
+ - No third-party mod dependency.
+ - No EULA acceptance file.
+ - No remote push or release.
++
++## D5 -> D6: phase-resolved polarization and coherent field reference
++
++- New pure-Java optical classes: `ComplexAmplitude`, `JonesVector`, `JonesMatrix`,
++  `VectorFieldPhasor`, `JonesGaussianBeam`, `CoherentOptics`.
++- New formal JUnit **source**: `JonesMatrixTest` (9), `CoherentOpticsTest` (14).
++- New standalone deterministic evidence: `CoherentSmoke`,
++  `CoherentReferenceProbe`, `verify_coherent_reference.py`, `run_d6_offline.sh`.
++- New `docs/OPT_001_COMPLEX_FIELD_REFERENCE.md` and D6 audit/evidence index.
++- Strengthened `tools/verify_m0.py` to require 194 real JUnit cases **and**
++  matching per-class XML suites, preventing unrelated cases from masking an
++  unexecuted new test class. Added two Python verifier unit tests.
++- Updated scientific status and limit docs; no changes to world-effect and
++  Owner model-approval production gate, no release/JDK25 build claim.
++- See `verification/M0-R2.1-D6/source-diff.csv` for exact file-level
++  ADD/MODIFY/REMOVE provenance and `source-diff.patch` for content changes.
+--- D5/docs/CHANGELOG.md
++++ D6/docs/CHANGELOG.md
+@@ -82,3 +82,19 @@
+ - NeoForge scaffold and stand-alone physics/experiment core folders.
+ - Project charter and first scientific model intake contract.
+ - Offline Java 12-check initial smoke test.
++
++
++## 2026-10-26 — CAC M0-R2.1-D6 (director numerical reference)
++
++- Added complex-valued Gaussian field phasors with explicit waist-phase, local
++  transverse Jones basis and phase-reference identity; no inferred laser-port waist.
++- Added ideal linear polarizer, quarter-/half-wave retarder and Jones matrix
++  composition, retaining relative/global phases for interferometry.
++- Added coherent and incoherent superposition, including Cartesian transverse
++  field rotation, cycle-averaged E/B energy densities and leading-order Poynting.
++- Added 23 JUnit-source methods, 19 independent Java smoke checks, 39 new
++  Decimal(70-digit) scalar comparisons, and updated formal verification threshold.
++- Protected against accidental duplicate beam IDs, incoherent summing of a
++  shared declared phase reference, carrier mismatch and implicit Jones gain.
++- No Owner model approval, new block, damage law, optical coating, Blender mesh,
++  Java 25 formal build or D6 game-runtime evidence. M0 remains OPEN.
+--- D5/docs/DECISIONS.md
++++ D6/docs/DECISIONS.md
+@@ -115,3 +115,24 @@
+ ## CAC-OPT-001-D5 (2026-10-26) — Scientific reference, not production approval
+ 
+ Owner chose standard real experimental laser optics. D5 engineers an independent scalar CW vacuum Gaussian TEM00 / ideal thin-lens ABCD reference without imposing a new device/waist location, paraxial threshold or world-damage mapping. Gaussian formulas are conventional physical theory; their D5 implementation is not an `OWNER_APPROVED` production `ModelCatalog` entry. Future emission geometry/thresholds and actual game integration require scientific approval and real-world adapter verification. JDK25 formal M0 Gate remains open.
++
++
++## CAC-D6 — Scientific reference decisions (not Owner physics signoff)
++
++- Use the standard time phasor `exp(-i omega t)`, vacuum scalar-paraxial
++  Gaussian amplitude with signed Gouy phase, and an explicit Cartesian Jones
++  basis. Coherence requires both an exact common carrier wavelength and a
++  declared common phase origin; mere key equality does not prove phase locking.
++- Store electric phasors in `sqrt(W/m²)` normalized units: a travelling wave
++  has `|F|²=I`, but in a standing wave `|F|²=2c*u_E` must not be mistaken for
++  the net Poynting flux. Compute E/B energy densities and flux separately.
++- Restrict Jones optical elements to ideal uniform polarizers/retarders;
++  general ABCD propagation does NOT yet carry the relative optical-path phase
++  necessary for a calibrated interferometer.
++- All D6 work remains a local numerical reference, not a newly authorized
++  physical model or world modification capability.
++
++- Real waveplates have a common propagation phase in addition to their
++  relative retardance. D6's two-argument factory sets the common phase zero
++  by gauge choice only; real arm-to-arm interference needs explicit
++  `withUniformPhaseRadians` or an approved calibrated optical path model.
+--- D5/docs/M0_R2_1_D6_AUDIT.md
++++ D6/docs/M0_R2_1_D6_AUDIT.md
+@@ -0,0 +1,153 @@
++# CAC-M0-R2.1-D6 — Independent Code Director Audit
++
++**Status:** D6 numerical optics draft COMPLETE as an offline checkpoint;
++**M0 FORMAL GATE NOT PASSED**. No playable equipment, no Owner-approved
++production physics and no Minecraft world mutation are added.
++
++## 1. Starting state and scope
++
++- Input `ColdAtomCraft-M0-R2.1-D5-DirectorCheckpoint.zip` passed archive CRC
++  and **242/242** embedded SHA-256 entries, then was copied into a separate
++  D6 working directory without altering the archived D5 input.
++- The existing D5 mathematical reference implemented scalar CW vacuum TEM00
++  Gaussian beams and lossless ABCD q transport, **not** complex field phase,
++  Jones polarization or interference.
++- D6 extends *physics-core only* with ideal vector-field observables. The
++  experiment/world ledger, server permission gates, Minecraft mod entrypoint
++  and ModelCatalog's Owner approval authority are unchanged.
++- Example optical wavelength `780 nm` in tests is illustrative; no claim that
++  it exactly equals a selected Rb-87 hyperfine cooling transition.
++
++## 2. Added engineering components
++
++| File | Role |
++| --- | --- |
++| `ComplexAmplitude.java` | Finite complex arithmetic; carrier-phase unit phasor |
++| `JonesVector.java` | Fully polarized complex two-axis field; normalization intentionally explicit |
++| `JonesMatrix.java` | Ideal linear polarizer; ideal quarter/half-wave retarder; ordered multiplication |
++| `VectorFieldPhasor.java` | Cartesian complex field, sqrt(W/m²) scale, normalized magnetic cross product |
++| `JonesGaussianBeam.java` | CW Gaussian + orthogonal local transverse Jones basis + explicit relative waist phase |
++| `CoherentOptics.java` | Coherent field summation, separately defined incoherent averaging, electric/magnetic energy density and leading-order flux |
++
++`beamId` prevents accidentally listing one branch twice. A declared phase
++reference and **exact common vacuum wavelength** are required for coherent
++addition; the fields must share a physically meaningful phase origin. Neither
++string is an authorization credential or proof of experimental coherence.
++
++## 3. Scientific correctness findings
++
++### Jones optics
++
++- Ideal linear polarizer obeys `P_out = P_in*cos²(theta)` for horizontal
++  incident light; crossed polarizers extinguish light; insertion of an
++  intermediate 45-degree polarizer produces `P_in/4`, not `P_in/8`.
++- The ideal retarder has `J = u u^T + exp(i delta) v v^T` in a documented
++  `exp(-i omega t)` convention. A quarter-wave plate produces a ±90-degree
++  relative phase, while a half-wave plate rotates linear polarization by
++  twice the physical orientation. Uniform lossless retarders preserve norm.
++- The ideal plate's **global optical phase is not determined by relative
++  retardance alone**. The default zero-eigenaxis-phase convention is documented,
++  and D6 exposes an explicit uniform path phase for calibrated two-arm
++  comparison. A test proves this phase can interchange destructive and
++  constructive interference without altering either arm's power.
++
++### Standing-wave Gouy correction
++
++The initial draft test incorrectly assumed `I_total=0` at `lambda/4` for two
++opposite, equal Gaussian beams. That plane-wave claim ignores the relative
++Gouy phase. The correct ideal Gaussian on-axis result is:
++
++```text
++I_e(z) = 4*I_single(z)*cos²(kz - atan(z/zR)),
++I_e(lambda/4) = 4*I_single(lambda/4)*sin²(atan(lambda/(4zR))) > 0.
++```
++
++The code was not modified to force zero; the **test was corrected** to the
++actual Gaussian formula, and an independent high-precision oracle validates
++this small but measurable-in-principle correction.
++
++### Electric, magnetic, total energy, and net energy flow
++
++Under the normalized field convention `F=sqrt(epsilon0*c/2)*E_peak`:
++
++```text
++I_elec_equiv = |F_total|² = 2c*<u_E>
++<u_E> = |F_total|²/(2c)
++<u_B> = |sum(k_hat x F)|²/(2c)
++<u_total> = <u_E> + <u_B>
++<S> = Re(F_total x conj(sum(k_hat x F)))  [W/m²]
++```
++
++For two equal counterpropagating modes, the on-axis time-averaged flux
++vanishes. At a field antinode, electric energy dominates; at a nearby
++plane-wave node, magnetic energy dominates. The combined cycle-averaged
++energy density stays `2*I_single(z)/c` to leading paraxial order. This is
++**not** equivalent to a net power deposition into blocks.
++
++For non-collinear beam directions, each Jones vector is rotated into the
++common Cartesian laboratory frame before summation. The magnetic proxy uses
++the central propagation direction of each paraxial beam, so transverse
++Poynting components due to wavefront curvature and tight-focus longitudinal
++fields are not included.
++
++## 4. Actually executed verification
++
++| Check | Actual result | Evidence |
++| --- | --- | --- |
++| D5 ZIP CRC and SHA manifest | **PASS 242/242** | input verification |
++| Original Java engineering smoke | **PASS 383/383** | `verification/M0-R2.1-D6/d6-offline-final.log` |
++| All Java JUnit **source methods via NON-JUNIT shim** | **PASS 194/194** | same log; **NOT formal JUnit** |
++| Legacy Gaussian/ABCD smoke | **PASS 21/21** | same log |
++| New complex/Jones smoke | **PASS 19/19** | same log |
++| D5 independent Decimal 80-digit oracle | **PASS 36/36 scalars** | same log + retained D5 script |
++| D6 independent Decimal 70-digit oracle | **PASS 39/39 scalars** | same log + `verify_coherent_reference.py` |
++| Python engineering tests | **PASS 30/30** | same log |
++| Java21 main-source `javac --release 21 -Xlint:all` | **PASS** with no warnings | `java21-lint.log` |
++| JDK25 preflight for actual formal build | **BLOCKED: JDK21 only**, exit 2 | `verification/M0-R2.1-D6/jdk25-preflight/report.json` |
++| Full D6 Gradle/JUnit/NeoForge JAR build | **NOT RUN** | no JDK25/dependency access |
++| D6 independent packed-JAR client/server load | **NOT RUN** | no D6 JAR generated |
++| Owner Blender export and actual render | **NOT RUN** | no supplied Blender asset |
++| World effect energy deposit / material heating | **NOT IMPLEMENTED** | physical/permission gates remain separate |
++
++The new `verify_m0.py` additionally rejects a formal JUnit run if any actual
++`*Test.java` suite lacks its matching Gradle JUnit XML, even if the total
++number of tests is high. This prevents older suites from masking a skipped
++Jones/interference test class. The mandatory count is 194, corresponding to
++all current JUnit source methods; **actual Gradle XML must still be produced**.
++
++## 5. Limitations, unresolved risks and next engineering Gate
++
++1. The input phase references are **user-provided mathematical values**.
++   Their shared key does not establish physically phase-locked hardware.
++2. Phase precision is sensitive to position precision at an optical
++   wavelength scale. A future apparatus adapter needs local path-length and
++   timing references and must not compute phase naively from huge MC global
++   coordinates.
++3. The `JonesGaussianBeam` model is unbounded along the formal Gaussian axis
++   and does not enforce physical shutter, port, aperture or occlusion geometry.
++4. A coherent two-arm overlap is **not** a complete energy-conserving optical
++   beam-combiner transfer matrix. Interferometer complementary ports, optical
++   losses and source/boundary bookkeeping must be implemented before any
++   world energy deposition or detector energy accounting.
++5. `GaussianPlane` transforms q but not absolute path phase through a lens
++   train. It must not be presented as an already phase-calibrated MZ
++   interferometer or a complete optical lattice beamline.
++6. Partial coherence, source linewidth/phase noise, different carrier
++   frequency beats, nonparaxial high-NA vector fields, physical interfaces,
++   vacuum/material transport and atomic effects are explicitly excluded.
++7. The M0 world's authoritative scheduler, snapshot/revision adapter and
++   crash-recovery mechanism remain separate incomplete production work.
++8. This host provides OpenJDK 21.0.12.1 but cannot resolve official Gradle,
++   NeoForge and Adoptium download hosts. No D6 JDK25/NeoForge build is
++   claimed; the previous R2 launch log does not validate D6.
++
++**Next hard Gate:** on an equipped Windows/JDK25 machine run
++`python tools/verify_m0.py`, retaining actual JUnit XML and final packaged
++JAR hash; then install that exact D6 JAR separately in client and dedicated
++server, after honoring all EULA/permissions requirements. M0 final signoff
++belongs to Owner after code-director review.
++
++**Next scientific Gate:** Owner supplies output-port-to-waist transform,
++polarization axes, source coherence/linewidth assumptions and hardware phase
++reference. Until then the OPT-001 CW/Jones calculations remain verified
++**reference equations**, not a certified experimental apparatus.
+--- D5/docs/M1_SCIENCE_INTAKE.md
++++ D6/docs/M1_SCIENCE_INTAKE.md
+@@ -25,3 +25,16 @@
+ - Permissions and multiplayer damage behavior.
+ 
+ **Do not conflate the four model IDs.** One approved Gaussian source does not authorize ignition/damage. The engineering team first implements OPT-001 with independent benchmarks, then asks for the next scientific decision.
++
++
++## D6 next-science questions (NOT defaults)
++
++- Which laser source/wavelength and linewidth are to be treated as a single
++  oscillator or experimentally phase-locked coherent group?
++- What are the optical waist position and its phase origin relative to the
++  actual Blender output port and beam propagation direction?
++- Which optical-path elements, polarization conventions and phase reference
++  must be supplied before interference or a standing wave is enabled in-game?
++- The pure Java field models do not provide an experimentally calibrated
++  source/splitter energy budget; do not use their local `|F|²` directly for
++  Minecraft heat, light damage or atom cooling without later approved models.
+--- D5/docs/OPT_001_COMPLEX_FIELD_REFERENCE.md
++++ D6/docs/OPT_001_COMPLEX_FIELD_REFERENCE.md
+@@ -0,0 +1,204 @@
++# OPT-001/CW-POL — Jones-polarized Gaussian phasors and coherent superposition (D6)
++
++**Scientific standing: DRAFT NUMERICAL REFERENCE, NOT OWNER_APPROVED.**
++
++The Owner chose **standard experimental optical models**. D6 extends the D5
++continuous-wave (CW), TEM00, scalar **vacuum paraxial** Gaussian reference with
++fully polarized Jones fields, uniform ideal polarization optics and coherent
++field superposition. The extra components do **not** constitute an experiment-
++calibrated instrument, a time-dependent atom–light model, a heat/absorption
++calculation or a Minecraft world effect. No production ModelCatalog entry or
++owner approval flag has been inserted.
++
++## 1. Frames, units, phase conventions
++
++- All positions, waist centres and beam direction vectors are in the **local
++  laboratory frame**, in SI metres, NOT Minecraft block coordinates.
++- Each `JonesGaussianBeam` declares a **beamId** (physical branch identity), a
++  **phaseReferenceKey** (shared ideal carrier/time-phase origin), a D5
++  `GaussianBeam`, a transverse-X laboratory unit direction and a Jones vector.
++- The local right-handed basis is `e_x`, `e_y = k_hat x e_x`, `k_hat`.
++  `e_x` must be orthogonal to the propagation axis; we reject incompatible
++  frames rather than silently projecting an invalid vector.
++- Jones amplitudes `Jx, Jy` are **dimensionless complex amplitudes**, with
++  `|Jx|² + |Jy|² <= 1` for the passive reference. Physical remaining beam
++  power after spatially uniform polarization optics is
++  `P_source * (|Jx|²+|Jy|²)`.
++- The peak-field phasor has the **`exp(-i omega t)` convention**. The phase at
++  the waist `phi_0` must be referenced to a common physical time origin.
++  The `phaseReferenceKey` is a declaration, not evidence that two sources are
++  actually phase-locked.
++- The internally stored Cartesian electric phasor `F` is scaled to units
++  `sqrt(W/m²)` by `F = sqrt(epsilon_0*c/2) E_peak`, with `c = 299792458 m/s`.
++  For a single paraxial travelling beam `|F|²` equals its irradiance.
++
++## 2. Standard Gaussian complex field
++
++At signed propagation coordinate `z`, transverse radius `r`, vacuum wave
++number `k=2*pi/lambda`, waist `w0`, and Gouy phase `psi=atan(z/zR)`:
++
++```text
++phi(r,z) = k*z + k*r*r/(2*R(z)) - psi(z) + phi_0
++F(r,z) = sqrt(2*P_source/(pi*w(z)^2)) * exp(-r*r/w(z)^2)
++         * exp(i*phi(r,z)) * (Jx*e_x + Jy*e_y).
++```
++
++The `kr²/(2R)` term is zero at the waist `z=0`; our implementation computes
++this term using a factorized expression to avoid unnecessarily squaring large
++numbers. The rapid `kz` phase is reduced modulo `lambda` before multiplication
++by `2*pi`. **This does not recover optical-phase precision absent from a
++floating-point position supplied by the caller**. In particular, phase
++sensitivity at large world coordinates requires an appropriate laboratory
++local origin and/or an improved relative optical-path representation.
++
++The field is a **mathematical paraxial propagation solution** at both positive
++and negative `z`; it is not a claim that a physical laser source emits through
++its housing or blocks behind its output port. Geometry, source aperture and
++shutter must be enforced by future hardware/world adapters.
++
++## 3. Ideal Jones elements
++
++For linear polarizer angle `theta`, `u=(cos(theta),sin(theta))`, the ideal
++projection matrix is `P=u*u^T`. A horizontally polarized input transmits
++`cos²(theta)` of its power (Malus law).
++
++For an ideal lossless thin retarder whose selected axis is `u`, perpendicular
++axis `v=(-sin(theta),cos(theta))`, and **perpendicular relative phase +delta**:
++
++```text
++J(theta, delta) = u*u^T + exp(i*delta) * v*v^T.
++```
++
++`delta = pi/2` and `pi` correspond to quarter-wave and half-wave retardance.
++The sign convention is tied to `exp(-i omega t)`, so helicity/left-vs-right
++circular labels are deliberately avoided until a globally oriented
++polarization/Zeeman convention is approved. The two-argument ideal retarder
++fixes the selected eigenaxis phase at zero **only as a mathematical gauge
++convention**. A real plate also contributes an unknown common propagation
++phase depending on thickness and index. The three-argument `idealRetarder`
++overload or `withUniformPhaseRadians` explicitly supplies that common path
++phase when calibrated. **A waveplate's relative retardance alone does not
++predict the absolute phase difference between two interferometer arms.**
++
++These ideal elements have no finite aperture, refractive-index interface,
++absorption-dependent heat or frequency change. The general record constructor
++exists for composing reference matrices; only the named factories describe
++ideal passive optical elements. A `JonesGaussianBeam` refuses Jones amplitudes
++that imply appreciable gain (amplitude norm greater than unity).
++
++## 4. Coherent interference, incoherence and energy transport
++
++For fully coherent waves with the **same exact carrier wavelength** and
++compatible declared phase origin:
++
++```text
++F_total = sum_j F_j
++G_total = sum_j (k_hat_j x F_j)  [leading-order vacuum magnetic proxy]
++I_electric_equivalent = |F_total|²
++<S> = Re(F_total x conjugate(G_total))                 [W/m²]
++u_E,avg = |F_total|² / (2*c)                         [J/m³]
++u_B,avg = |G_total|² / (2*c)                         [J/m³]
++u_total,avg = u_E,avg + u_B,avg.
++```
++
++**Crucial factor of two:** `|F|²` is **two times c times** the cycle-averaged
++*electric* energy density, not `c*u_E`. For a single travelling plane wave,
++`u_E = u_B = I/(2c)` and `u_total = I/c`.
++
++For mutually incoherent / phase-averaged sources, **not** field amplitudes,
++but the independent electric intensity equivalents add. The helper demands
++distinct phase reference keys rather than silently averaging sources that
++claim coherence. A partially coherent field, nonzero optical linewidth,
++beating of different frequencies or a nonstationary relative phase requires
++its own mutual coherence/correlation or time-dependent model; not implemented.
++
++**No general source power budget follows solely from phasor addition.**
++Mathematically superposing two same-mode, same-direction, same-phase fields of
++input power `P` gives local `4*I`, and integration of that constructed output
++would give `4P`. This is NOT an energy-conserving two-input interferometer
++simulation: the other output ports and boundary conditions of a real combiner
++must be modeled before accounting for energy transfer. D6 forbids using the
++coherent field aggregate as a direct material-energy/damage authorization.
++
++### Standing wave versus net energy flux
++
++Two ideal, equally powered, oppositely travelling, same-linearly-polarized
++Gaussian beams with co-located waists and relative reference phase zero give
++on-axis:
++
++```text
++|F_total(z)|² = 4*I_one(z)*cos²(k*z - psi(z))
++<S_z> = 0.
++```
++
++At the naive plane-wave node `z=lambda/4`, the Gaussian Gouy phases lead to a
++small but nonzero residual `4*I_one(z)*sin²(psi(z))`. Simultaneously, magnetic
++energy predominates there; the **total** cycle-averaged electromagnetic energy
++density remains `2*I_one(z)/c` under the local paraxial approximation. A
++standing wave's large `|F|²` at antinodes does NOT indicate net energy flow
++from one side. This matters for optical lattice potential (sensitive to
++`|E|²`) versus thermal/absorptive power budgets (requiring flux and coupling).
++
++For non-collinear beams the Cartesian vector amplitudes are summed after
++rotating each local Jones basis into the common laboratory frame; merely
++adding separate local `(Jx,Jy)` values would be incorrect. The approximate
++magnetic field uses the central beam direction; it ignores the small radial
++energy flow and longitudinal field components of a finite-divergence Gaussian.
++The actual local Poynting vector should not be treated as experimentally
++calibrated in tight-focus/high-NA scenarios.
++
++## 5. Program and correctness boundaries
++
++| API | Meaning |
++| --- | --- |
++| `ComplexAmplitude` | finite complex arithmetic and optical phase |
++| `JonesVector` | transverse complex field coefficients; not automatically normalized |
++| `JonesMatrix` | uniform ideal linear polarizer and thin retarder, ordered composition |
++| `JonesGaussianBeam` | passive branch with explicit waist phase, transverse frame and coherence group |
++| `VectorFieldPhasor` | lab-Cartesian complex electric field in sqrt(W/m²) |
++| `CoherentOptics` | same-carrier coherent phasor addition; distinct-group incoherent intensity; energy density and leading-order Poynting |
++
++- `beamId` duplicate checks prevent accidental mathematical double counting of
++  one listed branch. They are **not authentication or server asset ownership**.
++- `phaseReferenceKey` and `phaseAtWaistRadians` are scientific inputs; merely
++  using the same string cannot physically synchronize lasers.
++- There is no absolute optical-phase propagation through a general D5 ABCD
++  train yet. Thin lenses transform `q`, but their actual placement, optical
++  path phase and transmission are not modeled by D6 interference. Do not infer
++  that `GaussianPlane` can automatically be combined with a coherent
++  `JonesGaussianBeam` after arbitrary optical elements.
++- There is no beam clipping, thin-film Fresnel transmission/reflection,
++  partial coherence, spectral width, pulse propagation, vectorial high-NA
++  focusing, atomic susceptibility, external field, temperature or world damage.
++- No NeoForge renderer, MC unit conversion, client-authorized data,
++  instrument readout nor Owner-approved `ModelCatalog` entry is added.
++
++## 6. Verification performed
++
++- Source JUnit 5 tests: 9 `JonesMatrixTest` methods and 14
++  `CoherentOpticsTest` methods; count is **23 new methods**.
++- Offline *non-JUnit* assertion sweep: 194/194 methods including all older
++  modules. This is a standalone shim and not a real JUnit Platform result.
++- Dedicated standalone `CoherentSmoke`: 19/19 checks.
++- A new **independent Decimal(70 digits)** Python oracle evaluates 39 scalar
++  quantities from Malus/retarder, Gaussian/Gouy interference and Maxwell
++  energy/flux relations; `verification/M0-R2.1-D6/verify_coherent_reference.py`.
++- D5's 36 Decimal(80 digits) Gaussian/ABCD oracle comparisons are retained.
++- Java `javac --release 21 -Xlint:all`: pure physics and experiment sources
++  compile without warnings. JDK 21 is available here; formal **JDK25 JUnit,
++  Gradle build, NeoForge JAR, real client/server run** are independent pending
++  gates, not verified by this document.
++
++## 7. Reference literature
++
++- RP Photonics, *Gaussian Beams*, https://www.rp-photonics.com/gaussian_beams.html
++- TU Delft, *Interactive Optics — Polarisation* (Jones matrices),
++  https://interactivetextbooks.tudelft.nl/interactive-optics/content/Chap4_Polarisation/Polarization_2022_01Clean.html
++- Matrix-Optics Reference Tables, *Ideal Jones Elements*,
++  https://optics.engineering/knowledge_base/worked_exercises/introduction_matrix_methods_optics/reference_tables.html
++- B. E. A. Saleh and M. C. Teich, *Fundamentals of Photonics*;
++  A. E. Siegman, *Lasers* (textbook background).
++
++**Director status:** optics reference may advance to independent formal
++JDK25/JUnit verification; it remains SCIENTIFIC DRAFT / NOT OWNER_APPROVED and
++has no permission to deposit energy into a Minecraft world.
+--- D5/docs/PHYSICS_MODEL_CONTRACT.md
++++ D6/docs/PHYSICS_MODEL_CONTRACT.md
+@@ -24,3 +24,15 @@
+ - `BIO-001`: game entity exposure-to-damage mapping and protection rules (pending).
+ 
+ The owner's Blender device mesh is **not** a substitute for a physics definition, nor is a chosen formula a substitute for a game interaction specification.
++
++
++## D6 clarification — phasor/Jones reference remains unapproved
++
++D6 extends the draft `OPT-001` scalar CW vacuum TEM00 reference with fully
++polarized complex fields, ideal uniform Jones elements and ideal coherent
++superposition. **No production `OWNER_APPROVED` model has been registered.**
++Before M1 apparatus integration, Owner must specify phase reference, physical
++waist/port placement, emitter polarization basis, frequency controls and
++what experimental approximation regime to accept. D6 does not infer actual
++materials, absorption, damage, optical port budgets, linewidth or coherence
++from simple IDs. Full equations/limits: `OPT_001_COMPLEX_FIELD_REFERENCE.md`.
+--- D5/docs/TEST_PLAN.md
++++ D6/docs/TEST_PLAN.md
+@@ -158,3 +158,20 @@
+ - `verification/M0-R2.1-D5/run_d5_offline.sh` runs all available offline checks, which remain non-JUnit. `tools/verify_m0.py` now requires at least **171 formal JUnit5 XML test cases** (D4 153 + D5 18); a JDK21 offline reflection runner is not formal JUnit.
+ - OPT-001 is not wired into ModelCatalog or Minecraft world mutation. Hardware/waist geometry and paraxial domain certification are future science decisions.
+ - JDK25/Gradle/NeoForge and packaged D5 JAR/runtime checks are BLOCKED or NOT RUN on the current host; prior R2 launch logs do not validate D5.
++
++
++## D6 optics numerical reference gates (2026-10-26)
++
++- JUnit test **source** total: 194 methods (D5 baseline 171 + 22 D6).
++  Executed via NON-JUNIT offline assertion shim: PASS 194/194.
++- D6 dedicated smoke: PASS 19/19 on JDK21; independent Decimal(70) oracle:
++  PASS 39/39 new scalar comparisons. D5 36/36 Decimal(80) reference retained.
++- Pure Java `-Xlint:all --release 21`: PASS. Python engineering: 30/30 PASS.
++- JDK 25 real JUnit and Gradle/NeoForge build for **this D6 source**:
++  BLOCKED/NOT RUN here because JDK25/dependency network unavailable.
++- D6 packaged JAR standalone install / actual game runtime: NOT RUN.
++- Interferometer after full ABCD optical path, physical phase/coherence
++  calibration, atomic optical potential, material energy uptake: NOT IMPLEMENTED.
++- Phase tests include spatially varying counterpropagating Gaussian Gouy
++  phase, orthogonal polarizations, retarder global phase, power/energy-density
++  distinction and source/carrier-group mismatch rejection.
+--- D5/physics-core/src/main/java/dev/coldatomcraft/physics/optics/CoherentOptics.java
++++ D6/physics-core/src/main/java/dev/coldatomcraft/physics/optics/CoherentOptics.java
+@@ -0,0 +1,110 @@
++package dev.coldatomcraft.physics.optics;
++
++import dev.coldatomcraft.physics.Vec3;
++import java.util.HashSet;
++import java.util.List;
++import java.util.Set;
++
++/**
++ * Optical field superposition, separate from the Minecraft world.
++ *
++ * <p>Fully coherent sources must share the exact vacuum carrier wavelength,
++ * a single physical phase origin and a matching phaseReferenceKey. Otherwise
++ * optical beating/time averaging is outside this model. The scalar quantity
++ * |F|^2 is 2c times the cycle-averaged ELECTRIC energy density, NOT net
++ * transmitted power for standing waves. The magnetic term is distinct. The leading-order paraxial Poynting vector is returned
++ * separately.</p>
++ */
++public final class CoherentOptics {
++    public static final double VACUUM_LIGHT_SPEED_METERS_PER_SECOND = 299_792_458.0;
++    private CoherentOptics() {}
++
++    /** Fields use sqrt(W/m^2) normalization; H = sum(k_hat x F) in that scale. */
++    public record Result(VectorFieldPhasor electric, VectorFieldPhasor normalizedMagnetic) {
++        public Result {
++            if (electric == null || normalizedMagnetic == null) {
++                throw new IllegalArgumentException("electric/magnetic fields required");
++            }
++        }
++
++        public double electricIntensityEquivalentWattsPerSquareMeter() {
++            return electric.electricIntensityEquivalentWattsPerSquareMeter();
++        }
++
++        /** Cycle-averaged electric energy density epsilon0*|E_peak|^2/4. */
++        public double electricEnergyDensityJoulesPerCubicMeter() {
++            return electric.electricIntensityEquivalentWattsPerSquareMeter()
++                    / (2 * VACUUM_LIGHT_SPEED_METERS_PER_SECOND);
++        }
++
++        /** Cycle-averaged magnetic energy density B_peak^2/(4*mu0). */
++        public double magneticEnergyDensityJoulesPerCubicMeter() {
++            return normalizedMagnetic.electricIntensityEquivalentWattsPerSquareMeter()
++                    / (2 * VACUUM_LIGHT_SPEED_METERS_PER_SECOND);
++        }
++
++        /** Leading-order total electromagnetic energy density. */
++        public double totalEnergyDensityJoulesPerCubicMeter() {
++            return electricEnergyDensityJoulesPerCubicMeter()
++                    + magneticEnergyDensityJoulesPerCubicMeter();
++        }
++
++        /** Leading-order paraxial, time-averaged Poynting vector [W/m^2]. */
++        public Vec3 timeAveragePoyntingWattsPerSquareMeter() {
++            return electric.averagePoyntingWith(normalizedMagnetic);
++        }
++    }
++
++    /** Coherently sum electric and normalized magnetic phasors at one lab point. */
++    public static Result coherentAtLabPoint(Vec3 pointMeters, List<JonesGaussianBeam> beams) {
++        if (pointMeters == null) throw new IllegalArgumentException("sample point required");
++        validateNonemptyUniqueBeams(beams);
++        String reference = beams.get(0).phaseReferenceKey();
++        double wavelength = beams.get(0).beam().vacuumWavelengthMeters();
++        VectorFieldPhasor e = VectorFieldPhasor.ZERO;
++        VectorFieldPhasor h = VectorFieldPhasor.ZERO;
++        for (JonesGaussianBeam beam : beams) {
++            if (!reference.equals(beam.phaseReferenceKey())
++                    || Double.compare(wavelength, beam.beam().vacuumWavelengthMeters()) != 0) {
++                throw new IllegalArgumentException("coherent beams require matching phase reference and carrier wavelength");
++            }
++            VectorFieldPhasor sample = beam.sampleAtLabPoint(pointMeters);
++            e = e.plus(sample);
++            h = h.plus(sample.directionCross(beam.beam().directionLab()));
++        }
++        return new Result(e, h);
++    }
++
++    /**
++     * Time/ensemble-averaged electric intensity equivalent for independent
++     * phase reference groups. Different wavelengths are permitted here.
++     * Deliberately rejects two beams from the SAME declared coherence group.
++     */
++    public static double incoherentElectricIntensityEquivalentAtLabPoint(
++            Vec3 pointMeters, List<JonesGaussianBeam> beams) {
++        if (pointMeters == null) throw new IllegalArgumentException("sample point required");
++        validateNonemptyUniqueBeams(beams);
++        Set<String> groups = new HashSet<>();
++        double sum = 0;
++        for (JonesGaussianBeam beam : beams) {
++            if (!groups.add(beam.phaseReferenceKey())) {
++                throw new IllegalArgumentException("shared phase reference must not be silently summed incoherently");
++            }
++            sum += beam.sampleAtLabPoint(pointMeters).electricIntensityEquivalentWattsPerSquareMeter();
++        }
++        if (!Double.isFinite(sum)) throw new ArithmeticException("incoherent intensity overflow");
++        return sum;
++    }
++
++    private static void validateNonemptyUniqueBeams(List<JonesGaussianBeam> beams) {
++        if (beams == null || beams.isEmpty()) {
++            throw new IllegalArgumentException("at least one beam required");
++        }
++        Set<String> ids = new HashSet<>();
++        for (JonesGaussianBeam beam : beams) {
++            if (beam == null || !ids.add(beam.beamId())) {
++                throw new IllegalArgumentException("null or duplicate physical beam ID");
++            }
++        }
++    }
++}
+--- D5/physics-core/src/main/java/dev/coldatomcraft/physics/optics/ComplexAmplitude.java
++++ D6/physics-core/src/main/java/dev/coldatomcraft/physics/optics/ComplexAmplitude.java
+@@ -0,0 +1,63 @@
++package dev.coldatomcraft.physics.optics;
++
++/**
++ * Finite dimensionless complex arithmetic (or a complex optical phasor when
++ * paired with explicit units). No carrier-frequency, power or time semantics
++ * are attached to this value itself.
++ */
++public record ComplexAmplitude(double real, double imaginary) {
++    public static final ComplexAmplitude ZERO = new ComplexAmplitude(0, 0);
++    public static final ComplexAmplitude ONE = new ComplexAmplitude(1, 0);
++    public static final ComplexAmplitude I = new ComplexAmplitude(0, 1);
++
++    public ComplexAmplitude {
++        if (!Double.isFinite(real) || !Double.isFinite(imaginary)) {
++            throw new IllegalArgumentException("complex amplitude components must be finite");
++        }
++        if (real == 0) real = 0.0;
++        if (imaginary == 0) imaginary = 0.0;
++    }
++
++    public static ComplexAmplitude fromPhaseRadians(double phaseRadians) {
++        if (!Double.isFinite(phaseRadians)) {
++            throw new IllegalArgumentException("finite phase required");
++        }
++        // Avoid direct sin/cos evaluation on a large input. This does not
++        // restore phase detail already lost in the caller's input double.
++        double phase = Math.IEEEremainder(phaseRadians, 2 * Math.PI);
++        return new ComplexAmplitude(Math.cos(phase), Math.sin(phase));
++    }
++
++    public ComplexAmplitude plus(ComplexAmplitude other) {
++        if (other == null) throw new IllegalArgumentException("other required");
++        return new ComplexAmplitude(real + other.real, imaginary + other.imaginary);
++    }
++
++    public ComplexAmplitude minus(ComplexAmplitude other) {
++        if (other == null) throw new IllegalArgumentException("other required");
++        return new ComplexAmplitude(real - other.real, imaginary - other.imaginary);
++    }
++
++    public ComplexAmplitude times(ComplexAmplitude other) {
++        if (other == null) throw new IllegalArgumentException("other required");
++        return new ComplexAmplitude(
++                Math.fma(real, other.real, -imaginary * other.imaginary),
++                Math.fma(real, other.imaginary, imaginary * other.real));
++    }
++
++    public ComplexAmplitude scale(double scalar) {
++        if (!Double.isFinite(scalar)) throw new IllegalArgumentException("finite scalar required");
++        return new ComplexAmplitude(real * scalar, imaginary * scalar);
++    }
++
++    public ComplexAmplitude conjugate() {
++        return new ComplexAmplitude(real, -imaginary);
++    }
++
++    public double magnitudeSquared() {
++        double magnitude = Math.hypot(real, imaginary);
++        double square = magnitude * magnitude;
++        if (!Double.isFinite(square)) throw new ArithmeticException("phasor intensity overflow");
++        return square;
++    }
++}
+--- D5/physics-core/src/main/java/dev/coldatomcraft/physics/optics/JonesGaussianBeam.java
++++ D6/physics-core/src/main/java/dev/coldatomcraft/physics/optics/JonesGaussianBeam.java
+@@ -0,0 +1,90 @@
++package dev.coldatomcraft.physics.optics;
++
++import dev.coldatomcraft.physics.Vec3;
++
++/**
++ * A fully polarized CW Gaussian beam, as a complex electric-field reference.
++ * Source power and Gaussian spatial mode come from {@link GaussianBeam}.
++ * Jones amplitudes are in a local right-handed frame (x, k x x, k), with
++ * |J|^2 <= 1 to represent passive uniform polarization optics. The beam's
++ * actual optical power after Jones attenuation is P_source * |J|^2.
++ *
++ * <p>All beams with a common phaseReferenceKey MUST have the same optical
++ * carrier frequency and a phaseAtWaistRadians expressed against the same
++ * physical time/phase origin. The string is a declaration, NOT proof of laser
++ * coherence or an Owner physics approval. It is never accepted as a world
++ * mutation authority.</p>
++ *
++ * <p>Valid only for monochromatic scalar-paraxial TEM00 spatial profiles
++ * with transverse Jones polarization. The phase at the waist is a supplied
++ * optical phase, not inferred from a Minecraft laser port.</p>
++ */
++public record JonesGaussianBeam(String beamId,
++                                String phaseReferenceKey,
++                                GaussianBeam beam,
++                                Vec3 transverseXAxisLab,
++                                JonesVector jones,
++                                double phaseAtWaistRadians) {
++    public JonesGaussianBeam {
++        if (beamId == null || beamId.isBlank() || phaseReferenceKey == null
++                || phaseReferenceKey.isBlank()) {
++            throw new IllegalArgumentException("nonempty beam ID and shared phase reference required");
++        }
++        if (beam == null || transverseXAxisLab == null || jones == null
++                || !Double.isFinite(phaseAtWaistRadians)) {
++            throw new IllegalArgumentException("beam, Jones field, basis and finite phase required");
++        }
++        transverseXAxisLab = transverseXAxisLab.normalized();
++        if (Math.abs(transverseXAxisLab.dot(beam.directionLab())) > 1e-12) {
++            throw new IllegalArgumentException("transverse X must be perpendicular to beam direction");
++        }
++        double fraction = jones.squaredNorm();
++        if (fraction > 1 + 1e-12) {
++            throw new IllegalArgumentException("reference only supports passive Jones amplitudes");
++        }
++        phaseAtWaistRadians = Math.IEEEremainder(phaseAtWaistRadians, 2 * Math.PI);
++    }
++
++    public Vec3 transverseYAxisLab() {
++        return beam.directionLab().cross(transverseXAxisLab).normalized();
++    }
++
++    /** Optical power remaining after the uniform Jones element(s). */
++    public double transmittedPowerWatts() {
++        return beam.powerWatts() * jones.squaredNorm();
++    }
++
++    /**
++     * Electric phasor at a laboratory point in normalized sqrt(W/m^2) units.
++     * Standard Gaussian phase: kz + k*r^2/(2R) - Gouy + phaseAtWaist.
++     * Time convention is exp(-i omega t). Relative phases must share a
++     * physical reference, not merely similar numerical wavelengths.
++     */
++    public VectorFieldPhasor sampleAtLabPoint(Vec3 labPointMeters) {
++        if (labPointMeters == null) throw new IllegalArgumentException("lab point required");
++        Vec3 displacement = labPointMeters.subtract(beam.waistPositionLabMeters());
++        double z = displacement.dot(beam.directionLab());
++        double r = displacement.subtract(beam.directionLab().scale(z)).magnitude();
++        double sqrtIrradiance = Math.sqrt(beam.intensityWattsPerSquareMeter(r, z));
++        if (sqrtIrradiance == 0 || jones.squaredNorm() == 0) {
++            return VectorFieldPhasor.ZERO;
++        }
++        double wavelength = beam.vacuumWavelengthMeters();
++        // Reduce propagation phase modulo wavelength *before* multiplying by
++        // k: direct 2*pi*z/lambda has avoidable overflow/precision problems.
++        // Large position uncertainty remains a physical input limitation.
++        double carrier = 2 * Math.PI * (Math.IEEEremainder(z, wavelength) / wavelength);
++        double h = Math.hypot(z, beam.rayleighRangeMeters());
++        // k*r^2/(2R): algebraically pi*(r/lambda)*(r/h)*(z/h).
++        double curvature = Math.PI * (r / wavelength) * (r / h) * (z / h);
++        double phase = carrier + curvature - beam.gouyPhaseRadians(z) + phaseAtWaistRadians;
++        ComplexAmplitude factor = ComplexAmplitude.fromPhaseRadians(phase).scale(sqrtIrradiance);
++        ComplexAmplitude localX = jones.x().times(factor);
++        ComplexAmplitude localY = jones.y().times(factor);
++        Vec3 basisY = transverseYAxisLab();
++        return new VectorFieldPhasor(
++                localX.scale(transverseXAxisLab.x()).plus(localY.scale(basisY.x())),
++                localX.scale(transverseXAxisLab.y()).plus(localY.scale(basisY.y())),
++                localX.scale(transverseXAxisLab.z()).plus(localY.scale(basisY.z())));
++    }
++}
+--- D5/physics-core/src/main/java/dev/coldatomcraft/physics/optics/JonesMatrix.java
++++ D6/physics-core/src/main/java/dev/coldatomcraft/physics/optics/JonesMatrix.java
+@@ -0,0 +1,99 @@
++package dev.coldatomcraft.physics.optics;
++
++/**
++ * Jones transfer matrix of ideal thin, uniform, passive polarization optics.
++ * Applies to a single common transverse basis; does not include non-paraxial
++ * scattering, finite apertures, Fresnel coefficients or frequency conversion.
++ * Relative phase is retained. Absolute path phase is NOT inferred from
++ * a plate thickness: a separate common phase can be specified explicitly.
++ */
++public record JonesMatrix(ComplexAmplitude xx, ComplexAmplitude xy,
++                          ComplexAmplitude yx, ComplexAmplitude yy) {
++    public JonesMatrix {
++        if (xx == null || xy == null || yx == null || yy == null) {
++            throw new IllegalArgumentException("all Jones matrix coefficients required");
++        }
++    }
++
++    public static JonesMatrix identity() {
++        return new JonesMatrix(ComplexAmplitude.ONE, ComplexAmplitude.ZERO,
++                ComplexAmplitude.ZERO, ComplexAmplitude.ONE);
++    }
++
++    /** Ideal absorbing linear polarizer, its transmitted axis is at angle theta. */
++    public static JonesMatrix idealLinearPolarizer(double thetaRadians) {
++        if (!Double.isFinite(thetaRadians)) throw new IllegalArgumentException("finite angle required");
++        double c = Math.cos(thetaRadians);
++        double s = Math.sin(thetaRadians);
++        return real(c*c, c*s, c*s, s*s);
++    }
++
++    /**
++     * Ideal retarder. The axis at theta has multiplier 1; its perpendicular
++     * axis acquires relative phase +delta under exp(-i omega t) convention.
++     * Uniform, lossless optical element, without Fresnel/interface loss.
++     */
++    public static JonesMatrix idealRetarder(double thetaRadians, double deltaRadians) {
++        if (!Double.isFinite(thetaRadians) || !Double.isFinite(deltaRadians)) {
++            throw new IllegalArgumentException("finite angle and retardance required");
++        }
++        double c = Math.cos(thetaRadians);
++        double s = Math.sin(thetaRadians);
++        ComplexAmplitude e = ComplexAmplitude.fromPhaseRadians(deltaRadians);
++        ComplexAmplitude oneMinusE = ComplexAmplitude.ONE.minus(e);
++        return new JonesMatrix(
++                new ComplexAmplitude(c*c, 0).plus(e.scale(s*s)),
++                oneMinusE.scale(c*s),
++                oneMinusE.scale(c*s),
++                new ComplexAmplitude(s*s, 0).plus(e.scale(c*c)));
++    }
++
++    /**
++     * Explicit relative retardance AND common path phase. The two-argument
++     * factory chooses common phase zero as a gauge convention only; a real
++     * interferometer must supply the physically measured/calculated common
++     * phase accumulated through the plate and all other optical path elements.
++     */
++    public static JonesMatrix idealRetarder(double thetaRadians,
++                                            double deltaRadians,
++                                            double commonPhaseRadians) {
++        return idealRetarder(thetaRadians, deltaRadians)
++                .withUniformPhaseRadians(commonPhaseRadians);
++    }
++
++    /** Uniform optical-path phase multiplier; does not change Jones power. */
++    public JonesMatrix withUniformPhaseRadians(double phaseRadians) {
++        ComplexAmplitude multiplier = ComplexAmplitude.fromPhaseRadians(phaseRadians);
++        return new JonesMatrix(xx.times(multiplier), xy.times(multiplier),
++                yx.times(multiplier), yy.times(multiplier));
++    }
++
++    public static JonesMatrix quarterWave(double thetaRadians) {
++        return idealRetarder(thetaRadians, Math.PI / 2);
++    }
++
++    public static JonesMatrix halfWave(double thetaRadians) {
++        return idealRetarder(thetaRadians, Math.PI);
++    }
++
++    private static JonesMatrix real(double a, double b, double c, double d) {
++        return new JonesMatrix(new ComplexAmplitude(a, 0), new ComplexAmplitude(b, 0),
++                new ComplexAmplitude(c, 0), new ComplexAmplitude(d, 0));
++    }
++
++    public JonesVector apply(JonesVector incident) {
++        if (incident == null) throw new IllegalArgumentException("incident Jones vector required");
++        return new JonesVector(xx.times(incident.x()).plus(xy.times(incident.y())),
++                yx.times(incident.x()).plus(yy.times(incident.y())));
++    }
++
++    /** Apply this element first, then {@code following}. */
++    public JonesMatrix then(JonesMatrix following) {
++        if (following == null) throw new IllegalArgumentException("following matrix required");
++        return new JonesMatrix(
++                following.xx.times(xx).plus(following.xy.times(yx)),
++                following.xx.times(xy).plus(following.xy.times(yy)),
++                following.yx.times(xx).plus(following.yy.times(yx)),
++                following.yx.times(xy).plus(following.yy.times(yy)));
++    }
++}
+--- D5/physics-core/src/main/java/dev/coldatomcraft/physics/optics/JonesVector.java
++++ D6/physics-core/src/main/java/dev/coldatomcraft/physics/optics/JonesVector.java
+@@ -0,0 +1,50 @@
++package dev.coldatomcraft.physics.optics;
++
++/**
++ * Jones field amplitudes along an explicitly supplied transverse basis.
++ * The pair is NOT automatically normalized: after an ideal polarizer its
++ * squared norm is the fraction of incident optical power transmitted.
++ * For a physical input state use a unit-norm Jones vector.
++ *
++ * <p>The phasor uses exp(-i omega t) time dependence. Handedness labels for
++ * circular polarization additionally require the propagation/basis convention.</p>
++ */
++public record JonesVector(ComplexAmplitude x, ComplexAmplitude y) {
++    public JonesVector {
++        if (x == null || y == null) throw new IllegalArgumentException("both Jones components required");
++    }
++
++    public static JonesVector horizontal() {
++        return new JonesVector(ComplexAmplitude.ONE, ComplexAmplitude.ZERO);
++    }
++
++    public static JonesVector vertical() {
++        return new JonesVector(ComplexAmplitude.ZERO, ComplexAmplitude.ONE);
++    }
++
++    public static JonesVector linearRadians(double angle) {
++        if (!Double.isFinite(angle)) throw new IllegalArgumentException("finite angle required");
++        return new JonesVector(new ComplexAmplitude(Math.cos(angle), 0),
++                new ComplexAmplitude(Math.sin(angle), 0));
++    }
++
++    public double squaredNorm() {
++        double total = x.magnitudeSquared() + y.magnitudeSquared();
++        if (!Double.isFinite(total)) throw new ArithmeticException("Jones norm overflow");
++        return total;
++    }
++
++    public JonesVector times(ComplexAmplitude scalar) {
++        if (scalar == null) throw new IllegalArgumentException("complex scale required");
++        return new JonesVector(x.times(scalar), y.times(scalar));
++    }
++
++    public JonesVector scale(double scalar) {
++        return new JonesVector(x.scale(scalar), y.scale(scalar));
++    }
++
++    public JonesVector plus(JonesVector other) {
++        if (other == null) throw new IllegalArgumentException("other required");
++        return new JonesVector(x.plus(other.x), y.plus(other.y));
++    }
++}
+--- D5/physics-core/src/main/java/dev/coldatomcraft/physics/optics/VectorFieldPhasor.java
++++ D6/physics-core/src/main/java/dev/coldatomcraft/physics/optics/VectorFieldPhasor.java
+@@ -0,0 +1,58 @@
++package dev.coldatomcraft.physics.optics;
++
++import dev.coldatomcraft.physics.Vec3;
++
++/**
++ * Three Cartesian components of a complex electric-field phasor, scaled to
++ * sqrt(W/m^2) instead of V/m: F = sqrt(epsilon0*c/2) * E_peak in vacuum.
++ * Hence |F|^2 is an ELECTRIC-field intensity equivalent. For a single
++ * paraxial travelling beam it equals the usual irradiance. For counter-
++ * propagating waves it does not equal net energy flux; see Poynting calculation.
++ */
++public record VectorFieldPhasor(ComplexAmplitude x,
++                                ComplexAmplitude y,
++                                ComplexAmplitude z) {
++    public static final VectorFieldPhasor ZERO = new VectorFieldPhasor(
++            ComplexAmplitude.ZERO, ComplexAmplitude.ZERO, ComplexAmplitude.ZERO);
++
++    public VectorFieldPhasor {
++        if (x == null || y == null || z == null) {
++            throw new IllegalArgumentException("all 3 complex components required");
++        }
++    }
++
++    public VectorFieldPhasor plus(VectorFieldPhasor other) {
++        if (other == null) throw new IllegalArgumentException("other required");
++        return new VectorFieldPhasor(x.plus(other.x), y.plus(other.y), z.plus(other.z));
++    }
++
++    public double electricIntensityEquivalentWattsPerSquareMeter() {
++        double value = x.magnitudeSquared() + y.magnitudeSquared() + z.magnitudeSquared();
++        if (!Double.isFinite(value)) throw new ArithmeticException("electric intensity overflow");
++        return value;
++    }
++
++    /** Direction x this electric phasor: normalized magnetic H amplitude. */
++    public VectorFieldPhasor directionCross(Vec3 direction) {
++        if (direction == null) throw new IllegalArgumentException("direction required");
++        return new VectorFieldPhasor(z.scale(direction.y()).minus(y.scale(direction.z())),
++                x.scale(direction.z()).minus(z.scale(direction.x())),
++                y.scale(direction.x()).minus(x.scale(direction.y())));
++    }
++
++    /**
++     * Real(E x H*) in normalized vacuum units [W/m^2]. H must have already
++     * been assembled from each beam's k_hat x E. This is leading-order
++     * paraxial Poynting; vectorial nonparaxial corrections are NOT included.
++     */
++    public Vec3 averagePoyntingWith(VectorFieldPhasor normalizedMagnetic) {
++        if (normalizedMagnetic == null) throw new IllegalArgumentException("magnetic phasor required");
++        return new Vec3(
++                y.times(normalizedMagnetic.z.conjugate()).minus(
++                        z.times(normalizedMagnetic.y.conjugate())).real(),
++                z.times(normalizedMagnetic.x.conjugate()).minus(
++                        x.times(normalizedMagnetic.z.conjugate())).real(),
++                x.times(normalizedMagnetic.y.conjugate()).minus(
++                        y.times(normalizedMagnetic.x.conjugate())).real());
++    }
++}
+--- D5/physics-core/src/test/java/dev/coldatomcraft/physics/optics/CoherentOpticsTest.java
++++ D6/physics-core/src/test/java/dev/coldatomcraft/physics/optics/CoherentOpticsTest.java
+@@ -0,0 +1,217 @@
++package dev.coldatomcraft.physics.optics;
++
++import dev.coldatomcraft.physics.Vec3;
++import java.util.List;
++import org.junit.jupiter.api.Test;
++import static org.junit.jupiter.api.Assertions.*;
++
++class CoherentOpticsTest {
++    private static final double LAMBDA = 780e-9;
++    private static final double WAIST = 500e-6;
++    private static final double POWER = 0.02;
++    private static final Vec3 ORIGIN = new Vec3(0, 0, 0);
++    private static final Vec3 X = new Vec3(1, 0, 0);
++    private static final Vec3 Z = new Vec3(0, 0, 1);
++    private static final Vec3 NEG_Z = new Vec3(0, 0, -1);
++
++    private static JonesGaussianBeam beam(String id, String group, Vec3 dir,
++                                          JonesVector jones, double phase) {
++        return new JonesGaussianBeam(id, group,
++                new GaussianBeam(POWER, LAMBDA, WAIST, ORIGIN, dir), X, jones, phase);
++    }
++
++    private static void rel(double expected, double actual, double fractionalTolerance) {
++        assertEquals(expected, actual,
++                Math.max(1e-13, Math.abs(expected) * fractionalTolerance));
++    }
++
++    @Test void oneBeamElectricEquivalentMatchesGaussianAndPoyntingDirection() {
++        JonesGaussianBeam b = beam("beam-1", "common", Z, JonesVector.horizontal(), 0);
++        Vec3[] points = {ORIGIN, new Vec3(0, 0, 0.12), new Vec3(0.0002, 0, 0.15)};
++        for (Vec3 point : points) {
++            double expected = b.beam().intensityAtLabPointWattsPerSquareMeter(point);
++            var sum = CoherentOptics.coherentAtLabPoint(point, List.of(b));
++            rel(expected, sum.electricIntensityEquivalentWattsPerSquareMeter(), 1e-12);
++            Vec3 s = sum.timeAveragePoyntingWattsPerSquareMeter();
++            rel(expected, s.z(), 1e-12);
++            rel(0, s.x(), 0);
++            rel(0, s.y(), 0);
++        }
++    }
++
++    @Test void equalCopropagatingFieldsCreateFourTimesOrZeroIntensity() {
++        var b1 = beam("arm-1", "laser-1", Z, JonesVector.horizontal(), 0);
++        var constructive = beam("arm-2", "laser-1", Z, JonesVector.horizontal(), 0);
++        var destructive = beam("arm-3", "laser-1", Z, JonesVector.horizontal(), Math.PI);
++        double i = b1.beam().onAxisIntensityWattsPerSquareMeter(0);
++        rel(4*i, CoherentOptics.coherentAtLabPoint(ORIGIN, List.of(b1, constructive))
++                .electricIntensityEquivalentWattsPerSquareMeter(), 1e-14);
++        rel(0, CoherentOptics.coherentAtLabPoint(ORIGIN, List.of(b1, destructive))
++                .electricIntensityEquivalentWattsPerSquareMeter(), 1e-14);
++    }
++
++    @Test void quadraturePhaseAndOrthogonalPolarizationRemoveInterferenceCrossTerm() {
++        var h = beam("h", "shared", Z, JonesVector.horizontal(), 0);
++        double i = h.beam().onAxisIntensityWattsPerSquareMeter(0);
++        var quadrature = beam("q", "shared", Z, JonesVector.horizontal(), Math.PI/2);
++        rel(2*i, CoherentOptics.coherentAtLabPoint(ORIGIN, List.of(h, quadrature))
++                .electricIntensityEquivalentWattsPerSquareMeter(), 1e-14);
++        var v = beam("v", "shared", Z, JonesVector.vertical(), 0);
++        rel(2*i, CoherentOptics.coherentAtLabPoint(ORIGIN, List.of(h, v))
++                .electricIntensityEquivalentWattsPerSquareMeter(), 1e-14);
++    }
++
++    @Test void counterpropagatingStandingWaveHasFringesButZeroNetPowerFlux() {
++        var forward = beam("forward", "lattice", Z, JonesVector.horizontal(), 0);
++        var backward = beam("backward", "lattice", NEG_Z, JonesVector.horizontal(), 0);
++        double i = forward.beam().onAxisIntensityWattsPerSquareMeter(0);
++        var antinode = CoherentOptics.coherentAtLabPoint(ORIGIN, List.of(forward, backward));
++        rel(4*i, antinode.electricIntensityEquivalentWattsPerSquareMeter(), 1e-14);
++        rel(0, antinode.timeAveragePoyntingWattsPerSquareMeter().magnitude(), 0);
++        var node = CoherentOptics.coherentAtLabPoint(new Vec3(0, 0, LAMBDA/4),
++                List.of(forward, backward));
++        // A Gaussian is NOT a plane wave: oppositely travelling Gouy phases
++        // shift the node slightly. At z=lambda/4 the exact Gaussian result is
++        // 4 I(z) sin^2(atan(z/zR)), tiny but not mathematically zero.
++        double z = LAMBDA / 4;
++        double gouy = Math.atan(z / forward.beam().rayleighRangeMeters());
++        double expectedNode = 4 * forward.beam().onAxisIntensityWattsPerSquareMeter(z)
++                * Math.sin(gouy) * Math.sin(gouy);
++        rel(expectedNode, node.electricIntensityEquivalentWattsPerSquareMeter(), 2e-8);
++        rel(0, node.timeAveragePoyntingWattsPerSquareMeter().magnitude(), 1e-10);
++    }
++
++    @Test void nonCollinearBeamsUseCommonCartesianElectricFieldNotScalarJonesCoordinates() {
++        var alongZ = beam("z", "crossing", Z, JonesVector.vertical(), 0);
++        // For k along X, choose local transverse x along Y: Jones horizontal
++        // is therefore the same global Y orientation as beam along Z's Jones vertical.
++        var alongX = new JonesGaussianBeam("x", "crossing",
++                new GaussianBeam(POWER, LAMBDA, WAIST, ORIGIN, X),
++                new Vec3(0, 1, 0), JonesVector.horizontal(), 0);
++        double i = alongZ.beam().onAxisIntensityWattsPerSquareMeter(0);
++        var result = CoherentOptics.coherentAtLabPoint(ORIGIN, List.of(alongZ, alongX));
++        rel(4*i, result.electricIntensityEquivalentWattsPerSquareMeter(), 1e-14);
++        Vec3 flux = result.timeAveragePoyntingWattsPerSquareMeter();
++        rel(2*i, flux.x(), 1e-14);
++        rel(2*i, flux.z(), 1e-14);
++        rel(0, flux.y(), 0);
++    }
++
++    @Test void passThroughPolarizerReducesOpticalPowerAndPeakIntensity() {
++        var original = beam("in", "laser", Z, JonesVector.horizontal(), 0);
++        JonesVector outputJones = JonesMatrix.idealLinearPolarizer(Math.PI/4)
++                .apply(JonesVector.horizontal());
++        var transmitted = beam("out", "laser", Z, outputJones, 0);
++        rel(POWER/2, transmitted.transmittedPowerWatts(), 1e-14);
++        rel(original.sampleAtLabPoint(ORIGIN).electricIntensityEquivalentWattsPerSquareMeter()/2,
++                transmitted.sampleAtLabPoint(ORIGIN).electricIntensityEquivalentWattsPerSquareMeter(), 1e-14);
++    }
++
++    @Test void calibratedHalfWavePlatePathPhaseCanReverseInterferenceWithoutChangingPower() {
++        // In the convention where the selected eigenaxis has zero common
++        // path phase, a half-wave at theta=pi/2 multiplies horizontal by -1.
++        // This is NOT a prediction about a real plate's unknown absolute path
++        // phase: see the explicit 3-argument idealRetarder overload.
++        var unchanged = beam("plain", "arm-phase", Z, JonesVector.horizontal(), 0);
++        var throughPlate = beam("plate", "arm-phase", Z,
++                JonesMatrix.halfWave(Math.PI/2).apply(JonesVector.horizontal()), 0);
++        double i=unchanged.beam().onAxisIntensityWattsPerSquareMeter(0);
++        rel(POWER, throughPlate.transmittedPowerWatts(), 1e-14);
++        rel(0, CoherentOptics.coherentAtLabPoint(ORIGIN, List.of(unchanged, throughPlate))
++                .electricIntensityEquivalentWattsPerSquareMeter(), 1e-14);
++        rel(i, throughPlate.sampleAtLabPoint(ORIGIN)
++                .electricIntensityEquivalentWattsPerSquareMeter(), 1e-14);
++        var compensated = beam("plate-compensated", "arm-phase", Z,
++                JonesMatrix.idealRetarder(Math.PI/2, Math.PI, Math.PI)
++                        .apply(JonesVector.horizontal()), 0);
++        rel(4*i, CoherentOptics.coherentAtLabPoint(ORIGIN, List.of(unchanged, compensated))
++                .electricIntensityEquivalentWattsPerSquareMeter(), 1e-14);
++    }
++
++    @Test void incoherentSumUsesIntensitiesAndAllowsDifferentFrequencies() {
++        var a = beam("a", "laser-A", Z, JonesVector.horizontal(), 0);
++        var b = new JonesGaussianBeam("b", "laser-B",
++                new GaussianBeam(POWER, 1064e-9, WAIST, ORIGIN, Z), X,
++                JonesVector.horizontal(), Math.PI);
++        double i = a.beam().onAxisIntensityWattsPerSquareMeter(0);
++        rel(2*i, CoherentOptics.incoherentElectricIntensityEquivalentAtLabPoint(
++                ORIGIN, List.of(a, b)), 1e-14);
++        assertThrows(IllegalArgumentException.class,
++                () -> CoherentOptics.coherentAtLabPoint(ORIGIN, List.of(a, b)));
++    }
++
++    @Test void coherentInputMustSharePhaseReferenceAndExactCarrier() {
++        var a = beam("a", "laser-A", Z, JonesVector.horizontal(), 0);
++        var b = beam("b", "laser-B", Z, JonesVector.horizontal(), 0);
++        assertThrows(IllegalArgumentException.class,
++                () -> CoherentOptics.coherentAtLabPoint(ORIGIN, List.of(a, b)));
++        var c = new JonesGaussianBeam("c", "laser-A",
++                new GaussianBeam(POWER, 780.000001e-9, WAIST, ORIGIN, Z),
++                X, JonesVector.horizontal(), 0);
++        assertThrows(IllegalArgumentException.class,
++                () -> CoherentOptics.coherentAtLabPoint(ORIGIN, List.of(a, c)));
++        assertThrows(IllegalArgumentException.class,
++                () -> CoherentOptics.incoherentElectricIntensityEquivalentAtLabPoint(
++                        ORIGIN, List.of(a, beam("d", "laser-A", Z, JonesVector.horizontal(), 0))));
++    }
++
++    @Test void duplicateBeamIdentityCannotBeCountedTwice() {
++        var b = beam("same-id", "laser", Z, JonesVector.horizontal(), 0);
++        assertThrows(IllegalArgumentException.class,
++                () -> CoherentOptics.coherentAtLabPoint(ORIGIN, List.of(b, b)));
++        assertThrows(IllegalArgumentException.class,
++                () -> CoherentOptics.incoherentElectricIntensityEquivalentAtLabPoint(ORIGIN, List.of(b, b)));
++        assertThrows(IllegalArgumentException.class,
++                () -> CoherentOptics.coherentAtLabPoint(ORIGIN, List.of()));
++    }
++
++    @Test void energyDensityOfSingleTravelingBeamHasEqualElectricAndMagneticParts() {
++        var b = beam("travel", "energy", Z, JonesVector.horizontal(), 0);
++        var result = CoherentOptics.coherentAtLabPoint(ORIGIN, List.of(b));
++        double i = b.beam().onAxisIntensityWattsPerSquareMeter(0);
++        rel(i / (2 * CoherentOptics.VACUUM_LIGHT_SPEED_METERS_PER_SECOND),
++                result.electricEnergyDensityJoulesPerCubicMeter(), 1e-14);
++        rel(i / (2 * CoherentOptics.VACUUM_LIGHT_SPEED_METERS_PER_SECOND),
++                result.magneticEnergyDensityJoulesPerCubicMeter(), 1e-14);
++        rel(i / CoherentOptics.VACUUM_LIGHT_SPEED_METERS_PER_SECOND,
++                result.totalEnergyDensityJoulesPerCubicMeter(), 1e-14);
++    }
++
++    @Test void standingWaveRedistributesElectricAndMagneticEnergyWithoutNetFlux() {
++        var forward = beam("fw-energy", "energy", Z, JonesVector.horizontal(), 0);
++        var backward = beam("bw-energy", "energy", NEG_Z, JonesVector.horizontal(), 0);
++        double i = forward.beam().onAxisIntensityWattsPerSquareMeter(0);
++        double c = CoherentOptics.VACUUM_LIGHT_SPEED_METERS_PER_SECOND;
++        var peak = CoherentOptics.coherentAtLabPoint(ORIGIN, List.of(forward, backward));
++        rel(2*i/c, peak.electricEnergyDensityJoulesPerCubicMeter(), 1e-14);
++        rel(0, peak.magneticEnergyDensityJoulesPerCubicMeter(), 0);
++        double z=LAMBDA/4;
++        var trough = CoherentOptics.coherentAtLabPoint(new Vec3(0, 0, z),
++                List.of(forward, backward));
++        double iz=forward.beam().onAxisIntensityWattsPerSquareMeter(z);
++        rel(2*iz/c, trough.totalEnergyDensityJoulesPerCubicMeter(), 1e-14);
++        assertTrue(trough.electricEnergyDensityJoulesPerCubicMeter()
++                < trough.magneticEnergyDensityJoulesPerCubicMeter());
++        rel(0, trough.timeAveragePoyntingWattsPerSquareMeter().magnitude(), 1e-14);
++    }
++
++    @Test void rejectsInvalidGeometryActiveGainAndMissingPhaseIdentity() {
++        GaussianBeam scalar = new GaussianBeam(POWER, LAMBDA, WAIST, ORIGIN, Z);
++        assertThrows(IllegalArgumentException.class,
++                () -> new JonesGaussianBeam("x", "y", scalar, Z, JonesVector.horizontal(), 0));
++        assertThrows(IllegalArgumentException.class,
++                () -> new JonesGaussianBeam("x", "y", scalar, X,
++                        JonesVector.horizontal().scale(2), 0));
++        assertThrows(IllegalArgumentException.class,
++                () -> new JonesGaussianBeam("x", " ", scalar, X, JonesVector.horizontal(), 0));
++        assertThrows(IllegalArgumentException.class,
++                () -> new JonesGaussianBeam("x", "y", scalar, X, JonesVector.horizontal(), Double.NaN));
++    }
++
++    @Test void intensityAtOffAxisPointMatchesGaussianRadialLaw() {
++        var b = beam("spot", "reference", Z, JonesVector.linearRadians(Math.PI/7), 0.75);
++        Vec3 point = new Vec3(0.00015, -0.00021, 0.7);
++        rel(b.beam().intensityAtLabPointWattsPerSquareMeter(point),
++                b.sampleAtLabPoint(point).electricIntensityEquivalentWattsPerSquareMeter(), 2e-13);
++    }
++}
+--- D5/physics-core/src/test/java/dev/coldatomcraft/physics/optics/JonesMatrixTest.java
++++ D6/physics-core/src/test/java/dev/coldatomcraft/physics/optics/JonesMatrixTest.java
+@@ -0,0 +1,99 @@
++package dev.coldatomcraft.physics.optics;
++
++import org.junit.jupiter.api.Test;
++import static org.junit.jupiter.api.Assertions.*;
++
++class JonesMatrixTest {
++    private static void close(double expected, double measured) {
++        assertEquals(expected, measured, 2e-13 * Math.max(1, Math.abs(expected)));
++    }
++
++    @Test void idealPolarizerObeysMalusLaw() {
++        JonesVector incident = JonesVector.horizontal();
++        for (double theta : new double[]{0, Math.PI/12, Math.PI/6, Math.PI/4, Math.PI/2}) {
++            JonesVector transmitted = JonesMatrix.idealLinearPolarizer(theta).apply(incident);
++            close(Math.cos(theta) * Math.cos(theta), transmitted.squaredNorm());
++        }
++    }
++
++    @Test void crossedPolarizersExtinguishAndOrderIsPhysical() {
++        var horizontal = JonesMatrix.idealLinearPolarizer(0);
++        var vertical = JonesMatrix.idealLinearPolarizer(Math.PI / 2);
++        close(0, horizontal.then(vertical).apply(JonesVector.horizontal()).squaredNorm());
++        var tilted = JonesMatrix.idealLinearPolarizer(Math.PI / 4);
++        close(0.25, horizontal.then(tilted).then(vertical)
++                .apply(JonesVector.horizontal()).squaredNorm());
++    }
++
++    @Test void quarterWaveProducesQuadratureWithoutChangingPower() {
++        JonesVector diagonal = JonesVector.linearRadians(Math.PI / 4);
++        JonesVector result = JonesMatrix.quarterWave(0).apply(diagonal);
++        close(1, result.squaredNorm());
++        close(0, result.x().imaginary());
++        close(0, result.y().real());
++        close(Math.sqrt(0.5), result.x().real());
++        close(Math.sqrt(0.5), result.y().imaginary());
++    }
++
++    @Test void halfWaveRotatesLinearAxisByTwiceOrientation() {
++        JonesVector output = JonesMatrix.halfWave(Math.PI / 8).apply(JonesVector.horizontal());
++        close(Math.sqrt(0.5), output.x().real());
++        close(Math.sqrt(0.5), output.y().real());
++        close(1, output.squaredNorm());
++    }
++
++    @Test void idealRetarderIsUnitaryForArbitraryInputEllipses() {
++        JonesVector state = new JonesVector(new ComplexAmplitude(0.2, 0.3),
++                new ComplexAmplitude(-0.4, 0.5));
++        double original = state.squaredNorm();
++        for (double angle : new double[]{0, 0.17, Math.PI/4, Math.PI/2}) {
++            for (double delay : new double[]{0, Math.PI/2, Math.PI, -1.4}) {
++                close(original, JonesMatrix.idealRetarder(angle, delay).apply(state).squaredNorm());
++            }
++        }
++    }
++
++    @Test void composingMatricesMatchesSequentialApplicationIncludingPhase() {
++        JonesVector state = new JonesVector(new ComplexAmplitude(0.4, -0.2),
++                new ComplexAmplitude(0.3, 0.1));
++        var a = JonesMatrix.idealRetarder(0.3, 1.2);
++        var b = JonesMatrix.idealLinearPolarizer(-0.17);
++        JonesVector serial = b.apply(a.apply(state));
++        JonesVector combined = a.then(b).apply(state);
++        close(serial.x().real(), combined.x().real());
++        close(serial.x().imaginary(), combined.x().imaginary());
++        close(serial.y().real(), combined.y().real());
++        close(serial.y().imaginary(), combined.y().imaginary());
++    }
++
++    @Test void globalPhaseDoesNotChangeSingleBeamPowerButChangesComplexAmplitude() {
++        JonesVector original = JonesVector.horizontal();
++        JonesVector shifted = original.times(ComplexAmplitude.fromPhaseRadians(Math.PI/2));
++        close(original.squaredNorm(), shifted.squaredNorm());
++        close(0, shifted.x().real());
++        close(1, shifted.x().imaginary());
++    }
++
++    @Test void wavePlateCommonPathPhaseMustBeExplicitForCoherentArms() {
++        JonesVector input=JonesVector.horizontal();
++        JonesVector reference=JonesMatrix.idealRetarder(Math.PI/2, Math.PI).apply(input);
++        JonesVector compensated=JonesMatrix.idealRetarder(Math.PI/2, Math.PI, Math.PI).apply(input);
++        close(-1, reference.x().real());
++        close(1, compensated.x().real());
++        close(1, reference.squaredNorm());
++        close(1, compensated.squaredNorm());
++        assertThrows(IllegalArgumentException.class,
++                () -> JonesMatrix.identity().withUniformPhaseRadians(Double.NaN));
++    }
++
++    @Test void rejectsNonFiniteInputsAndNullJonesElements() {
++        assertThrows(IllegalArgumentException.class, () -> ComplexAmplitude.fromPhaseRadians(Double.NaN));
++        assertThrows(IllegalArgumentException.class, () -> new ComplexAmplitude(Double.POSITIVE_INFINITY, 0));
++        assertThrows(IllegalArgumentException.class, () -> JonesMatrix.idealLinearPolarizer(Double.NaN));
++        assertThrows(IllegalArgumentException.class, () -> JonesMatrix.idealRetarder(0, Double.POSITIVE_INFINITY));
++        assertThrows(IllegalArgumentException.class, () -> JonesMatrix.identity().apply(null));
++        assertThrows(IllegalArgumentException.class, () -> new JonesVector(null, ComplexAmplitude.ONE));
++        assertThrows(IllegalArgumentException.class, () -> ComplexAmplitude.ONE.times(null));
++        assertThrows(IllegalArgumentException.class, () -> ComplexAmplitude.ONE.scale(Double.NaN));
++    }
++}
+--- D5/tools/verify_m0.py
++++ D6/tools/verify_m0.py
+@@ -23,7 +23,7 @@
+ 
+ from inspect_mod_jar import inspect
+ 
+-MINIMUM_JUNIT_TEST_COUNT = 171  # D4 153 + D5 18 OPT-001 @Test methods
++MINIMUM_JUNIT_TEST_COUNT = 194  # D4 153 + D5 18 + D6 23 JUnit-source @Test methods
+ GRADLE_TASKS = (
+     "clean", ":physics-core:test", ":experiment-core:test",
+     ":neoforge-mod:build", ":neoforge-mod:verifyDistributableJar",
+@@ -43,6 +43,23 @@
+         for key in ("tests", "failures", "errors", "skipped"):
+             counts[key] += int(report.attrib.get(key, "0"))
+     return counts
++
++
++def missing_junit_suites(root: Path) -> list[str]:
++    """Require XML evidence for every currently present top-level *Test.java class.
++
++    Counts alone are insufficient: unrelated tests could hide a missing new
++    optics test suite after a misconfigured source set or Gradle filter.
++    """
++    missing: list[str] = []
++    for module in ("physics-core", "experiment-core"):
++        sources = root / module / "src/test/java"
++        results = root / module / "build/test-results/test"
++        for source in sorted(sources.rglob("*Test.java")):
++            class_name = ".".join(source.relative_to(sources).with_suffix("").parts)
++            if not (results / f"TEST-{class_name}.xml").is_file():
++                missing.append(f"{module}:{class_name}")
++    return missing
+ 
+ 
+ def run(name: str, argv: list[str], root: Path, evidence: Path) -> dict:
+@@ -81,7 +98,7 @@
+         source_root=str(root),
+         timestamp_utc=stamp,
+         os=platform.platform(),
+-        scope="M0-D5 source build/JUnit/JAR content only; NOT game startup or Owner signoff",
++        scope="M0-D6 source build/JUnit/JAR content only; NOT game startup or Owner signoff",
+         checks={},
+         actual_installed_jar_runtime="NOT RUN",
+         minecraft_client_runtime="NOT RUN",
+@@ -129,6 +146,7 @@
+         steps = (
+             ("java25-smoke", smoke),
+             ("optics-high-precision-oracle", [sys.executable, "verification/M0-R2.1-D5/verify_optics_reference.py"]),
++            ("coherent-high-precision-oracle", [sys.executable, "verification/M0-R2.1-D6/verify_coherent_reference.py"]),
+             ("python-tests", [sys.executable, "-m", "unittest", "discover",
+                               "-s", "verification", "-p", "test_*.py", "-v"]),
+             ("asset-schema", [sys.executable, "tools/validate_assets.py",
+@@ -145,9 +163,11 @@
+                 return 1 if report["status"] == "FAIL" else 2
+ 
+         junit = junit_evidence(root)
++        junit["missing_required_suites"] = missing_junit_suites(root)
+         junit["status"] = "PASS" if (junit["tests"] >= MINIMUM_JUNIT_TEST_COUNT and
+                                       junit["failures"] == junit["errors"] == junit["skipped"] == 0 and
+-                                      junit["files"] >= 2) else "FAIL"
++                                      junit["files"] >= 2 and
++                                      not junit["missing_required_suites"]) else "FAIL"
+         report["checks"]["real-junit-xml"] = junit
+         if junit["status"] != "PASS":
+             report["status"] = "FAIL"
+--- D5/verification/CoherentSmoke.java
++++ D6/verification/CoherentSmoke.java
+@@ -0,0 +1,88 @@
++package dev.coldatomcraft.verification;
++
++import dev.coldatomcraft.physics.Vec3;
++import dev.coldatomcraft.physics.optics.*;
++import java.util.List;
++
++/** Standalone analytic smoke: no JUnit, Gradle or Minecraft dependency. */
++public final class CoherentSmoke {
++    private static int checks;
++    private static final Vec3 ORIGIN = new Vec3(0, 0, 0);
++    private static final Vec3 X = new Vec3(1, 0, 0);
++    private static final Vec3 Z = new Vec3(0, 0, 1);
++    private static final double LAMBDA = 780e-9;
++    private static final double P = 0.02;
++    private static final double W0 = 0.0005;
++    private static final GaussianBeam BEAM = new GaussianBeam(P, LAMBDA, W0, ORIGIN, Z);
++
++    private static void check(boolean valid, String what) {
++        checks++;
++        if (!valid) throw new AssertionError(what);
++    }
++
++    private static void near(double actual, double expected, double scale, String what) {
++        check(Double.isFinite(actual) && Math.abs(actual - expected)
++                <= Math.max(1e-13, Math.abs(scale) * 2e-12), what);
++    }
++
++    private static JonesGaussianBeam source(String name, JonesVector pol, double phase) {
++        return new JonesGaussianBeam(name, "one-phase-reference", BEAM, X, pol, phase);
++    }
++
++    public static void main(String[] args) {
++        var first = source("arm-a", JonesVector.horizontal(), 0);
++        var same = source("arm-b", JonesVector.horizontal(), 0);
++        var opposite = source("arm-c", JonesVector.horizontal(), Math.PI);
++        var vertical = source("arm-d", JonesVector.vertical(), 0);
++        var quadrature = source("arm-e", JonesVector.horizontal(), Math.PI / 2);
++        double i = BEAM.onAxisIntensityWattsPerSquareMeter(0);
++        near(first.sampleAtLabPoint(ORIGIN).electricIntensityEquivalentWattsPerSquareMeter(),i,i,"one-beam intensity");
++        near(first.transmittedPowerWatts(),P,P,"one-beam power");
++        near(CoherentOptics.coherentAtLabPoint(ORIGIN,List.of(first,same))
++                .electricIntensityEquivalentWattsPerSquareMeter(),4*i,i,"constructive");
++        near(CoherentOptics.coherentAtLabPoint(ORIGIN,List.of(first,opposite))
++                .electricIntensityEquivalentWattsPerSquareMeter(),0,i,"destructive");
++        near(CoherentOptics.coherentAtLabPoint(ORIGIN,List.of(first,vertical))
++                .electricIntensityEquivalentWattsPerSquareMeter(),2*i,i,"orthogonal");
++        near(CoherentOptics.coherentAtLabPoint(ORIGIN,List.of(first,quadrature))
++                .electricIntensityEquivalentWattsPerSquareMeter(),2*i,i,"pi/2 phase");
++        near(CoherentOptics.coherentAtLabPoint(ORIGIN,List.of(first,same))
++                .timeAveragePoyntingWattsPerSquareMeter().z(),4*i,i,"co-prop flux");
++        var pol45=JonesMatrix.idealLinearPolarizer(Math.PI/4).apply(JonesVector.horizontal());
++        near(pol45.squaredNorm(),0.5,1,"Malus law");
++        near(source("after-pol",pol45,0).transmittedPowerWatts(),P/2,P,"polarized power");
++        near(JonesMatrix.quarterWave(0).apply(JonesVector.linearRadians(Math.PI/4))
++                .squaredNorm(),1,1,"QWP lossless");
++        near(JonesMatrix.halfWave(Math.PI/8).apply(JonesVector.horizontal()).y().real(),
++                Math.sqrt(0.5),1,"HWP rotates");
++        JonesGaussianBeam backward=new JonesGaussianBeam("counter","one-phase-reference",
++                new GaussianBeam(P,LAMBDA,W0,ORIGIN,new Vec3(0,0,-1)),X,
++                JonesVector.horizontal(),0);
++        var standing=CoherentOptics.coherentAtLabPoint(ORIGIN,List.of(first,backward));
++        near(standing.electricIntensityEquivalentWattsPerSquareMeter(),4*i,i,"standing antinode");
++        near(standing.timeAveragePoyntingWattsPerSquareMeter().magnitude(),0,i,"zero standing net flux");
++        double z=LAMBDA/4;
++        var nearNode=CoherentOptics.coherentAtLabPoint(new Vec3(0,0,z),List.of(first,backward));
++        double gouy=BEAM.gouyPhaseRadians(z);
++        near(nearNode.electricIntensityEquivalentWattsPerSquareMeter(),
++                4*BEAM.onAxisIntensityWattsPerSquareMeter(z)*Math.sin(gouy)*Math.sin(gouy),
++                4*BEAM.onAxisIntensityWattsPerSquareMeter(z)*Math.sin(gouy)*Math.sin(gouy),
++                "Gaussian Gouy shifts plane-wave node");
++        boolean rejected=false;
++        try { CoherentOptics.coherentAtLabPoint(ORIGIN,List.of(first,first)); }
++        catch(IllegalArgumentException expected){ rejected=true; }
++        check(rejected,"no duplicate beam physical ID");
++        rejected=false;
++        try { new JonesGaussianBeam("wrong","one-phase-reference",BEAM,Z,JonesVector.horizontal(),0); }
++        catch(IllegalArgumentException expected){rejected=true;}
++        check(rejected,"transverse basis must be orthogonal");
++        rejected=false;
++        try { new JonesGaussianBeam("gain","one-phase-reference",BEAM,X,
++                    JonesVector.horizontal().scale(2),0); }
++        catch(IllegalArgumentException expected){rejected=true;}
++        check(rejected,"gain cannot enter passive reference");
++        near(ComplexAmplitude.I.times(ComplexAmplitude.I).real(),-1,1,"complex multiply");
++        near(ComplexAmplitude.fromPhaseRadians(Math.PI).magnitudeSquared(),1,1,"complex unit phase");
++        System.out.println("PASS: " + checks + " D6 coherent optics smoke checks; pure Java draft reference");
++    }
++}
+--- D5/verification/test_verify_m0.py
++++ D6/verification/test_verify_m0.py
+@@ -6,7 +6,7 @@
+ import uuid
+ 
+ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
+-from verify_m0 import junit_evidence, MINIMUM_JUNIT_TEST_COUNT
++from verify_m0 import junit_evidence, missing_junit_suites, MINIMUM_JUNIT_TEST_COUNT
+ 
+ 
+ class EvidenceParserTest(unittest.TestCase):
+@@ -41,6 +41,22 @@
+         self.assertEqual((6, 1, 2, 1),
+                          (counts['tests'], counts['failures'], counts['errors'], counts['skipped']))
+ 
++    def test_missing_suite_is_detected_even_when_total_test_count_is_high(self):
++        src = self.root / 'physics-core/src/test/java/example/JonesMatrixTest.java'
++        src.parent.mkdir(parents=True)
++        src.write_text('class JonesMatrixTest {}', encoding='utf-8')
++        self.write_xml('physics-core','TEST-Unrelated.xml',tests=MINIMUM_JUNIT_TEST_COUNT)
++        self.assertEqual(['physics-core:example.JonesMatrixTest'], missing_junit_suites(self.root))
++
++    def test_each_expected_test_source_must_have_matching_junit_xml(self):
++        for module, cls in [('physics-core','example.JonesMatrixTest'),
++                            ('experiment-core','example.WorldEffectLedgerTest')]:
++            src=self.root/module/'src/test/java'/Path(*cls.split('.')).with_suffix('.java')
++            src.parent.mkdir(parents=True,exist_ok=True)
++            src.write_text('class Test {}',encoding='utf-8')
++            self.write_xml(module, 'TEST-'+cls+'.xml', tests=1)
++        self.assertEqual([], missing_junit_suites(self.root))
++
+     def test_wrong_xml_element_is_rejected(self):
+         folder = self.root / 'physics-core/build/test-results/test'
+         folder.mkdir(parents=True, exist_ok=True)

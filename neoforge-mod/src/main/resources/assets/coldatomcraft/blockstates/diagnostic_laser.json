@@ -1,0 +1,44 @@
+{
+  "variants": {
+    "enabled=false,facing=south": {
+      "model": "coldatomcraft:block/diagnostic_laser_off",
+      "y": 0,
+      "uvlock": true
+    },
+    "enabled=false,facing=east": {
+      "model": "coldatomcraft:block/diagnostic_laser_off",
+      "y": 270,
+      "uvlock": true
+    },
+    "enabled=false,facing=north": {
+      "model": "coldatomcraft:block/diagnostic_laser_off",
+      "y": 180,
+      "uvlock": true
+    },
+    "enabled=false,facing=west": {
+      "model": "coldatomcraft:block/diagnostic_laser_off",
+      "y": 90,
+      "uvlock": true
+    },
+    "enabled=true,facing=south": {
+      "model": "coldatomcraft:block/diagnostic_laser_on",
+      "y": 0,
+      "uvlock": true
+    },
+    "enabled=true,facing=east": {
+      "model": "coldatomcraft:block/diagnostic_laser_on",
+      "y": 270,
+      "uvlock": true
+    },
+    "enabled=true,facing=north": {
+      "model": "coldatomcraft:block/diagnostic_laser_on",
+      "y": 180,
+      "uvlock": true
+    },
+    "enabled=true,facing=west": {
+      "model": "coldatomcraft:block/diagnostic_laser_on",
+      "y": 90,
+      "uvlock": true
+    }
+  }
+}

@@ -1,0 +1,10 @@
+plugins {
+    id 'base'
+}
+allprojects {
+    group = 'dev.coldatomcraft'
+    version = rootProject.findProperty('mod_version')
+    repositories {
+        mavenCentral()
+    }
+}

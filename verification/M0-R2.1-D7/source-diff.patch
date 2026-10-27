@@ -1,0 +1,1589 @@
+--- D6/.github/workflows/ci.yml
++++ D7/.github/workflows/ci.yml
+@@ -38,6 +38,8 @@
+         run: |
+           bash tools/verify-core.sh
+           python verification/M0-R2.1-D5/verify_optics_reference.py
++          python verification/M0-R2.1-D6/verify_coherent_reference.py
++          python verification/M0-R2.1-D7/verify_optical_path_reference.py
+           python -m unittest discover -s verification -p 'test_*.py' -v
+           python tools/validate_assets.py assets/manifests/laser_source.example.json
+ 
+@@ -74,19 +76,20 @@
+           from pathlib import Path
+           import sys
+           sys.path.insert(0, 'tools')
+-          from verify_m0 import junit_evidence, MINIMUM_JUNIT_TEST_COUNT
++          from verify_m0 import junit_evidence, missing_junit_suites, MINIMUM_JUNIT_TEST_COUNT
+           counts = junit_evidence(Path('.'))
+           print('Actual JUnit XML:', counts)
+           assert counts['tests'] >= MINIMUM_JUNIT_TEST_COUNT
+           assert counts['failures'] == counts['errors'] == counts['skipped'] == 0
+           assert counts['files'] >= 2
++          assert not missing_junit_suites(Path('.'))
+           PYTHON
+ 
+       - name: Upload JUnit reports
+         if: always()
+         uses: actions/upload-artifact@v4
+         with:
+-          name: CAC-M0-R2.1-D5-junit-reports
++          name: CAC-M0-R2.1-D7-junit-reports
+           path: |
+             physics-core/build/test-results/test/*.xml
+             experiment-core/build/test-results/test/*.xml
+@@ -96,6 +99,6 @@
+       - name: Upload NeoForge JAR
+         uses: actions/upload-artifact@v4
+         with:
+-          name: CAC-M0-R2.1-D5-neoforge
++          name: CAC-M0-R2.1-D7-neoforge
+           path: neoforge-mod/build/libs/*.jar
+           retention-days: 14
+--- D6/README.md
++++ D7/README.md
+@@ -1,3 +1,45 @@
++# CAC-M0-R2.1-D7 — phase-tracked experimental optical-path reference (2026-10-26)
++
++**D7 is a scientific numerical DRAFT, not an Owner-approved production model,
++NeoForge playable laser or official M0 runtime sign-off.** M0 JDK25 / NeoForge
++verification on the **D7 source** is BLOCKED/NOT RUN in this JDK21 host.
++
++From the frozen, SHA-verified D6 source, D7 introduces a power-normalized,
++phase-tracked Gaussian/Jones optical mode, lossless symmetric two-port beam
++splitter and immutable optical path trace. The Mach-Zehnder regression shows
++phase-controlled port redistribution **without creating power**. It refuses
++mismatched carrier/q/coherence/basis inputs rather than silently promoting
++an unmatched field to a single Gaussian mode.
++
++- JUnit 5 *source* methods: 224 total (30 new); offline reflection **NON-JUNIT**
++  methods pass; D7 standalone optical smoke 19; independent Decimal80 oracle
++  29 scalar comparisons. Retains the D5 36 and D6 39 independent checks.
++- Engineering build scripts and CI now include D6 and D7 science checks and
++  require all JUnit class reports, not just a high aggregate test count.
++- Experimental optical phase requires calibrated path lengths. The ULP
++  precision diagnostic explicitly warns against using large MC world
++  coordinates as interferometric phase.
++- **No real mirror geometry, coatings, Fresnel interfaces, splitter orientation,
++  materials, atoms, detectors, Blender model or world damage implemented.**
++
++Read [D7 scientific reference](docs/OPT_001_OPTICAL_PATH_REFERENCE.md),
++[D7 evidence](verification/M0-R2.1-D7/README.md) and
++[D7 director audit](docs/M0_R2_1_D7_AUDIT.md).
++
++Offline reference command (uses JDK21 and NON-JUNIT shim):
++
++```sh
++sh verification/M0-R2.1-D7/run_d7_offline.sh
++```
++
++Formal JDK25/Gradle/JUnit/JAR gate (on a properly configured build host):
++
++```sh
++python tools/verify_m0.py
++```
++
++---
++
+ # Cold Atom Craft — M0-R2.1-D6 Complex-field and Jones optics reference (2026-10-26)
+ 
+ **Two separate Gate statuses:** M0 NeoForge build/runtime for **D6** remains
+--- D6/docs/ARCHITECTURE.md
++++ D7/docs/ARCHITECTURE.md
+@@ -1,3 +1,18 @@
++## D7 optics reference sublayer (2026-10-26)
++
++`physics-core/optics` now has a phase-aware `ParaxialModeField`, immutable
++`OpticalPathTrace` and matched-mode `IdealTwoPortBeamSplitter`. A trace is
++one optical branch; two-port scattering is explicitly separate, so both
++coherent output powers stay in the budget. The modal phase includes carrier
++phase plus Gouy phase, not just ABCD q transport. These are independent
++laboratory optical quantities, not server/world-authorized commands.
++
++`phaseReferenceKey` and `modeFrameKey` are only declared calibration
++labels. The required NeoForge world-space port geometry, mirror orientation,
++coating, aperture and actual Blender asset are NOT implemented. A phase-only
++mirror proxy must not be mistaken for physical reflection. See
++`docs/OPT_001_OPTICAL_PATH_REFERENCE.md` for scope and equations.
++
+ ## D4 performance and validation split
+ 
+ The Ledger stores a monotonic per-run claim marker solely to avoid repeatedly
+--- D6/docs/CHANGELOG.md
++++ D7/docs/CHANGELOG.md
+@@ -1,3 +1,16 @@
++## 2026-10-26 — CAC-M0-R2.1-D7 (experimental optical path)
++
++- Add `ParaxialModeField` with phase-aware vacuum Gaussian propagation,
++  lens phase, uniform Jones optics, local beam sampling and path ULP diagnostics.
++- Add `IdealTwoPortBeamSplitter`: symmetric lossless, unitary 2-port reference,
++  retaining both output powers and rejecting mismatched modes.
++- Add immutable `OpticalPathTrace` with tracked-mode power removal (not heat).
++- Add 30 JUnit-source regression tests, D7 smoke/Decimal80 oracle, docs.
++- Include D6/D7 optics smoke and oracles in Java25/CI gate; raise the required
++  JUnit-source method count to 224 and require all new suite XML files.
++- Keep OPT-001 scientific DRAFT and no world material interactions.
++- Formal JDK25 NeoForge runtime for this D7 source remains unverified.
++
+ ## CAC-M0-R2.1-D5 — OPT-001 draft optics reference
+ 
+ - Added `physics-core/.../optics/GaussianBeam`, `GaussianQ`, `ParaxialAbcd` and `GaussianPlane`: scalar vacuum CW TEM00 intensity, Gaussian q parameter, ideal thin lens and free propagation; all SI units, no game effects.
+--- D6/docs/DECISIONS.md
++++ D7/docs/DECISIONS.md
+@@ -1,3 +1,16 @@
++## CAC-D7: matched-mode interferometer reference (2026-10-26)
++
++**Engineering-only draft reference:** introduce carrier- and Gouy-phase-tracked
++modal amplitudes (sqrt(W)), plus a symmetric lossless 2-port scattering
++matrix. Both outputs are mandatory for energy accounting. Recombination is
++allowed only for explicitly equal wavelength, Gaussian q, coherence reference
++and matching modal basis declaration; geometric validation is deferred.
++Mirror and plate global phases are explicit inputs, never assumed from
++missing coating data. ULP diagnostic exposes the precision limitation of
++using global MC world coordinates for interferometry. No production
++ModelCatalog/Owner approval or damage capability is added. Real JDK25 runtime
++remains an independent gate.
++
+ ## D3 engineering decision — 2026-10-26
+ 
+ - Mandatory per-session **apparatus/operation tick-window reservation** in the pure Java
+--- D6/docs/M0_R2_1_D7_AUDIT.md
++++ D7/docs/M0_R2_1_D7_AUDIT.md
+@@ -0,0 +1,104 @@
++# CAC-M0-R2.1-D7 — director engineering and scientific audit
++
++**Date:** 2026-10-26 (user-local project dating)
++
++**Input:** D6 frozen checkpoint, ZIP SHA-256
++`ee32c94ac0093cf170e7e32edddfc64196b8e86be03c4e2234803bfb2526a122`;
++**267/267** manifest entries verified before changes.
++
++**Current status:** PHYSICS-CORE OPT-001 DRAFT REFERENCE / offline tests PASS;
++M0 D7 JDK25 Gradle/JUnit/JAR build **BLOCKED**, D7 actual NeoForge
++client/server runtime **NOT RUN**, official scientific Owner approval **PENDING**.
++No production `ModelCatalog` approvals were added.
++
++## Problem and approach
++
++D5 supplied paraxial Gaussian `q` and optical power, and D6 introduced
++complex phasors and Jones polarization. However, transporting `q` through
++ABCD alone does not determine the carrier and accumulated Gouy phase; and
++naively summing two arm electric fields without the unused output port can
++misrepresent an interferometer's energy budget.
++
++D7 introduces a separate **reference-plane, matched-mode** optical layer:
++
++1. `ParaxialModeField` records `q`, λ and complex Jones modal amplitudes in
++   `sqrt(W)` with explicit coherence and modal-frame labels. Its free-space
++   transfer adds modulo-wavelength carrier and Gouy phase, its ideal thin
++   lens updates `q` and requires an explicitly calibrated on-axis phase, and
++   passive Jones elements preserve or reduce modal power.
++2. `IdealTwoPortBeamSplitter` implements the lossless reciprocal symmetric
++   unitary 2x2 scattering convention with *both* outputs retained.
++3. `OpticalPathTrace` provides an immutable sequential path history and
++   a tracked-mode loss tally. Loss from the selected mode is **not** heat.
++
++A declared phase/mode label is not evidence of real alignment. The two-port
++model strictly rejects mismatched `q`, λ, phase references and mode-frame
++labels. A physically misaligned or multimode path is explicitly outside D7.
++
++## Physical numerical benchmarks
++
++Test inputs for the principal reference: λ=780 nm, waist w0=0.5 mm and
++P=20 mW, with Rayleigh range ≈1.006920722304421 m.
++
++- Free propagation is power preserving; q grows by signed forward path L.
++- A single lossless lens leaves on-plane spot and power unchanged, modifies
++  wavefront curvature and does not silently add a common interferometric phase.
++- A polarizer at 45 degrees removes half the horizontal input's *tracked-mode*
++  power, without assigning that deficit to actual material absorption.
++- At a balanced Mach-Zehnder, equal arms give a dark and a bright output.
++  With additional arm phase Δ=π/3, powers are **5 mW and 15 mW**,
++  respectively, summing to the 20 mW input; Δ=π switches ports.
++- Nonbalanced and random-complex-Jones two-port inputs preserve total power.
++- `inputPathUlpPhaseRadians` flags loss of sub-wavelength phase resolution
++  when lengths are represented by coarse floating-point world coordinates.
++
++## Verification evidence
++
++| Gate | Result | Evidence |
++| --- | --- | --- |
++| D6 ZIP and original file manifest | **PASS 267/267** | before source extraction |
++| Existing pure Java engineering smoke | PASS 383/383 | D7 `offline-final.log` |
++| Full source-method sweep with offline assertion shim | **PASS 224/224** | NOT real JUnit; D7 `offline-final.log` |
++| D5 Gaussian smoke | PASS 21/21 | D7 `offline-final.log` |
++| D6 coherent smoke | PASS 19/19 | D7 `offline-final.log` |
++| D7 optical path smoke | PASS 19/19 | D7 `offline-final.log` |
++| Independent D5 Decimal80 oracle | PASS 36 scalar values | D7 `offline-final.log` |
++| Independent D6 Decimal70 oracle | PASS 39 scalar values | D7 `offline-final.log` |
++| Independent D7 Decimal80 oracle | **PASS 29 scalar values** | `verify_optical_path_reference.py` and D7 `offline-final.log` |
++| Python engineering/asset tests | PASS 30/30 | D7 `offline-final.log` |
++| JDK21 `javac --release 21 -Xlint:all` production sources | PASS, no warnings | `java21-lint.log` |
++| JDK25/Gradle/JUnit build and packaged D7 JAR | **BLOCKED / NOT RUN** | JDK25 preflight `report.json`; host has JDK21 |
++| D7 NeoForge 26.3 actual client/server or separate installed JAR | NOT RUN | no D7 JAR exists |
++| Blender real model export and hardware calibration | NOT RUN | no Owner asset or setup supplied |
++| World laser damage, atomic cooling or heat deposition | NOT IMPLEMENTED | separate Owner scientific gates |
++
++Prior R2 development world/server logs are retained solely as historical
++baseline evidence; they do **not** validate D7 modified source.
++
++## Major limitations and future gates
++
++- `ParaxialModeField` carries a **local** optical reference plane, not
++  physical block coordinates, component intersection or a real optical port.
++- A phase-only mirror annotation does NOT implement reflection geometry,
++  Fresnel s/p phase, coating loss or polarization-basis transport. A full
++  reflection implementation is a separate science/asset integration gate.
++- Real beam splitter phase and port signs depend on coatings and port labeling;
++  the D7 unitary convention is a chosen idealized gauge, not measured hardware.
++- Identical q and labels are necessary here for the single Gaussian modal
++  representation; they do not physically guarantee mode matching. Arbitrary
++  spatial mode overlap and multiple modes are not implemented.
++- Explicit optical phase is vulnerable to path length input precision; no
++  Minecraft global-coordinate or network timestamp is an acceptable source
++  of sub-wavelength phase calibration by default.
++- All D7 data is read-only physics reference: no device block or world effect.
++- Runtime verification and real JUnit XML from JDK25 remain required before
++  accepting this as a verified NeoForge M0/M1 artifact.
++
++## Director decision
++
++Approve as a **pure Java scientific-reference checkpoint**, not as a formal
++M0 release or a production physical model. The next useful implementation
++would be real mirror/port geometry and a measurement model, *after* completing
++JDK25/NeoForge validation and obtaining Owner hardware/asset constraints.
++
++The complete test/manifest/diff evidence accompanies the source ZIP.
+--- D6/docs/M1_SCIENCE_INTAKE.md
++++ D7/docs/M1_SCIENCE_INTAKE.md
+@@ -1,3 +1,15 @@
++## D7 scientific intake (NO implied defaults)
++
++D7 now supplies matched-mode two-port interference with explicit phase and
++power conservation, but does NOT calibrate any physical apparatus. Before
++world integration, the Owner/model team must decide: laser reference-plane
++position vs Blender output port; a phase-coherent source key with measured
++stability; interferometer arm optical-path lengths and accuracy; beam splitter
++port mapping plus wavelength/polarization-dependent scattering coefficients;
++actual mirror surface geometry and s/p phase; mode overlap/waist alignment;
++instrument aperture and detection model. No heat or atomic force can be
++inferred from tracked-mode optical power removal.
++
+ # First Light scientific intake — OPT-001 owner worksheet
+ 
+ The Owner selected standard real experimental laser models. A narrow **draft** CW TEM00 vacuum Gaussian + ideal ABCD numerical reference now exists; see `OPT_001_GAUSSIAN_REFERENCE.md`. Exact emission-plane/waist geometry, instrument validity limits, measured hardware parameters and production-model signoff are still outstanding. These questions are not automatically answered by choosing Gaussian optics.
+--- D6/docs/OPT_001_OPTICAL_PATH_REFERENCE.md
++++ D7/docs/OPT_001_OPTICAL_PATH_REFERENCE.md
+@@ -0,0 +1,181 @@
++# CAC OPT-001-D7: Phase-tracked paraxial modal optics (SCIENTIFIC DRAFT)
++
++**Scope:** Independent Java reference in `physics-core`, no NeoForge integration,
++no material absorption, no game world mutation and no Owner production-model
++approval. It builds on D5 scalar Gaussian/ABCD and D6 Jones/coherent fields.
++
++## Physical model and variables
++
++A classical monochromatic, continuous-wave TEM00 beam in vacuum is represented
++at a reference plane by:
++
++- Vacuum carrier wavelength `lambda` in metres;
++- Complex Gaussian parameter `q=x+i*y`, `y>0`, in metres;
++- A transverse Jones modal amplitude `a=(a_x,a_y)`, complex `sqrt(W)`;
++- A declared coherent laser phase reference key and spatial/polarization
++  mode-frame key. These *strings are assertions*, not alignment measurements
++  or server-world identity/permission information.
++
++The optical power in that tracked spatial/polarization mode is
++`P=|a_x|^2+|a_y|^2` [W]. This is deliberately distinct from a raw local
++`|E|^2` electric intensity equivalent, a Poynting flux or power deposited
++in a material.
++
++The reference-plane transverse field uses the D6 time convention
++`exp(-i omega t)`, the **existing D5 positive-imaginary q convention**
++`1/q=1/R-i*lambda/(pi*w^2)` and transverse Gaussian shape:
++
++```
++F(r) = a * sqrt(2/(pi*w^2)) * exp(-r^2/w^2)
++          * exp(+i*k*r^2/(2*R))  [sqrt(W/m^2)]
++```
++
++where `w=w(q,lambda)` and `1/R=Re(1/q)`. The signed axis and transverse
++basis are **local optical-port inputs**, not MC world coordinates.
++
++The field is normalized: integrating the transverse single-traveling-mode
++intensity over the infinite plane yields `P`. D7 can sample this field
++at a requested nonnegative transverse radius; it does not include apertures
++or actual optical surface geometry.
++
++## Free-space propagation and Gouy phase
++
++For a physical path length `L>=0`, the ideal vacuum paraxial field obeys:
++
++```
++q_out = q_in + L
++phi_out - phi_in = k*L + arg(conj(q_in)) - arg(conj(q_out))
++                = k*L + atan2(y,x+L) - atan2(y,x)
++a_out = a_in * exp(i*(phi_out-phi_in))
++```
++
++The second term is the **accumulated Gouy phase** of the normalized spatial
++mode. At the waist `q_in=i*zR`, it becomes `-atan(L/zR)`.
++
++A pure ABCD `q` transfer without this modal phase is not sufficient for an
++interferometer. D7 keeps both separately.
++
++`ParaxialModeField.freeSpace()` reduces `L` modulo `lambda` before converting
++to carrier phase. The diagnostic `inputPathUlpPhaseRadians(L)` reports how
++many carrier-phase radians correspond to **one double ULP of the supplied
++optical path**. This is a numerical precision warning, NOT an instrument
++uncertainty or an upper error bound. At large Minecraft world coordinates,
++absolute metres in binary floating point may already lack sub-wavelength
++precision. Use local experimental coordinates and calibrated path phase, not
++large world-coordinate differences, for a real interferometer.
++
++## Thin lens
++
++An ideal, lossless infinitely thin lens at one plane implements:
++
++```
++q_out = q_in / (1-q_in/f)
++1/R_out = 1/R_in - 1/f
++P_out = P_in
++```
++
++The on-axis field at the lens plane is continuous **up to an explicitly
++provided common phase**. The Gaussian field transverse curvature acquires
++`-k*r^2/(2*f)` relative to the incident field. D7 takes the common
++on-axis phase as an explicit argument, rather than inventing it from lens
++thickness/coating/refractive index that the Owner has not specified.
++This is valid only inside the ideal thin-lens/paraxial model. No Fresnel
++loss, clipping, aberration, finite NA, or refractive-index dispersion.
++
++## Passive Jones elements and path histories
++
++A uniform passive Jones matrix transforms the modal 2-vector:
++`a_out=J*a_in`. A passive-element method rejects gain for the actual input.
++Named D6 Jones factories supply ideal polarizers, QWPs and HWPs. Uniform
++phase is preserved; a plate's relative retardance alone never specifies its
++full interferometric common path phase.
++
++`OpticalPathTrace` is immutable and retains ordered operations and states.
++Its `powerRemovedFromTrackedModeWatts` measures **loss from the tracked
++mode only**, not guaranteed local heating/absorption. In particular, a
++polarizer's removed mode power cannot be handed to `WorldEffectLedger` as
++absorbed energy.
++
++`idealMirrorPhaseOnly()` / `withIdealMirrorReferencePhaseRadians()` are
++**phase-only route annotations**. They do not reflect a world-space ray,
++rotate polarization axes, implement Fresnel s/p coefficients, or specify
++coating reflectance. Full physical mirror rendering/reflection is
++NOT IMPLEMENTED in D7.
++
++## Symmetric lossless two-port beam splitter
++
++For two matched coherent modal inputs `a_0` and `a_1`, the fixed phase-gauge
++convention is:
++
++```
++[b_0] = [sqrt(T)  i*sqrt(1-T)] [a_0]
++[b_1]   [i*sqrt(1-T)  sqrt(T)] [a_1]
++```
++
++`0<=T<=1` is a *power* transmission coefficient; the complex reflection
++coefficient carries `+pi/2` relative phase. The matrix is unitary. It
++operates independently on both Jones components and must preserve **the
++sum of output powers**, including coherent two-input interference.
++These phase signs are a *chosen symmetric port convention*, not a prediction
++of a real beam splitter coating or which Blender side is physically labelled
++port 0. A real laboratory must supply/calibrate its ports, s/p dependence,
++coating phases and alignment.
++
++The reference class refuses to collapse different carrier wavelengths,
++phase origins, mode-frame declarations or unequal `q` into one Gaussian.
++An actual unmatched-mode interferometer requires spatial overlap integrals,
++multiple mode outputs or a full wave-optics field propagation method.
++The solver deliberately fails rather than silently projecting mismatched
++beams into a single TEM00 mode.
++
++A classical single-input splitter has a zero-amplitude *other* input. This
++is not a quantum-optics model of vacuum fluctuations or shot noise.
++
++### Mach-Zehnder analytic test
++
++Two ideal 50/50 splitters, identical mode-matched propagation in both arms,
++and one arm with relative phase `delta` yield:
++
++```
++P_out_0 = P_in*sin^2(delta/2)
++P_out_1 = P_in*cos^2(delta/2)
++P_out_0 + P_out_1 = P_in
++```
++
++At `delta=0`, output 0 is dark and output 1 is bright; at `delta=pi` the
++ports switch. No actual MC device geometry, arm lengths, beam spot overlap
++or detector is implemented yet.
++
++## Verification and provenance
++
++- D6 frozen ZIP input hash: see `verification/M0-R2.1-D7/README.md`.
++- Three new production classes: `ParaxialModeField`,
++  `IdealTwoPortBeamSplitter`, `OpticalPathTrace`.
++- Three new JUnit test source classes: 30 additional `@Test` methods;
++  the complete 224 methods pass the D7 offline **NON-JUNIT** assertion sweep.
++- D7 standalone smoke: 19 checks.
++- A separate `Decimal(80 digits)` Python oracle independently validates
++  29 free-space/Gouy/lens/Jones/beam-splitter/Mach-Zehnder/power-budget
++  scalar quantities against the compiled Java implementation.
++- Retains 36 D5 and 39 D6 high-precision oracle comparisons.
++- Formal Java25 Gradle/JUnit, NeoForge 26.3 game/client/server and packaged
++  JAR verification remain separate uncompleted gates on this host.
++
++## Scientific and software limitations
++
++No finite beam apertures, tilted-mirror geometry, s/p Fresnel coefficients,
++rotating local polarization frames, mode-overlap loss, coherent beating,
++partial coherence, pulse envelopes, finite laser linewidth, high-NA/vector
++fields, atomic optical interactions or game-material heating are modeled.
++Model creation is not an Owner production model approval.
++
++**References:**
++- RP Photonics, Gaussian beams and ABCD matrices:
++  https://www.rp-photonics.com/gaussian_beams.html
++  https://www.rp-photonics.com/abcd_matrix.html
++- RP Photonics, wave-optics sign conventions:
++  https://www.rp-photonics.com/sign_conventions_in_wave_optics.html
++- Lossless two-port coupler unitarity, Sci Rep (2021):
++  https://www.nature.com/articles/s41598-021-84588-w
++- Finesse, accumulated Gouy phase:
++  https://finesse.ifosim.org/docs/latest/usage/higher_order_modes/accumulated_gouy_phase.html
+--- D6/docs/PHYSICS_MODEL_CONTRACT.md
++++ D7/docs/PHYSICS_MODEL_CONTRACT.md
+@@ -1,3 +1,13 @@
++## OPT-001-D7 scientific reference (not Owner approval)
++
++A new matched-mode CW TEM00 two-port interferometer reference tracks q,
++complex sqrt(W) Jones modal amplitudes and path phase in vacuum. It is a
++provisional standard-optics numerical reference only. The user has chosen
++real experimental optical equations, but has not approved specific hardware
++phase calibrations, splitter coatings or production damage thresholds.
++`TrackedModePowerLoss` is NOT equivalent to absorbed heat. No new production
++ModelCatalog entry is OWNER_APPROVED.
++
+ # Scientific Model Intake Contract
+ 
+ Every physics model submitted for implementation should supply the following, where relevant:
+--- D6/docs/TEST_PLAN.md
++++ D7/docs/TEST_PLAN.md
+@@ -1,3 +1,17 @@
++## D7 optical-path checkpoint (2026-10-26)
++
++- New formal JUnit5 *source* classes: `ParaxialModeFieldTest` (13),
++  `IdealTwoPortBeamSplitterTest` (13), `OpticalPathTraceTest` (4), total 30;
++  the total suite now has **224** source `@Test` methods.
++- D7 standalone `OpticalPathSmoke`: **19** assertions (pure JDK21 on this host).
++- Decimal80 independent D7 optical-path oracle: **29** scalar comparisons;
++  D5 36 and D6 39 independent comparisons retained.
++- Offline assertion runner is **not** formal JUnit; CI and `verify_m0.py`
++  explicitly require actual JUnit XML for every class on JDK25.
++- D7 official JDK25 build/JUnit/JAR, Minecraft client/server and physically
++  installed mod JAR: BLOCKED/NOT RUN on this Linux JDK21/no-download host.
++- No material-energy, Blender model or production Owner-approved optics model.
++
+ # D4 current verification (2026-10-26)
+ 
+ | Gate | Current D4 result | Scope |
+--- D6/physics-core/src/main/java/dev/coldatomcraft/physics/optics/IdealTwoPortBeamSplitter.java
++++ D7/physics-core/src/main/java/dev/coldatomcraft/physics/optics/IdealTwoPortBeamSplitter.java
+@@ -0,0 +1,57 @@
++package dev.coldatomcraft.physics.optics;
++
++/**
++ * A lossless, reciprocal, symmetric two-port optical-mode coupler with
++ * the fixed phase convention S=[[sqrt(T),i*sqrt(R)],
++ *                                    [i*sqrt(R),sqrt(T)]], R=1-T.
++ * Both output ports are retained: interference redistributes power between
++ * ports, never creates or destroys it in the ideal model.
++ *
++ * <p>Ports must have identical q, wavelength, declared coherence reference
++ * and declared polarization mode-frame key. This is a strict matched-mode
++ * model, NOT an overlap integral for differently shaped/aligned beams,
++ * a thin-film coating model, or a geometrical ray direction transform.</p>
++ */
++public record IdealTwoPortBeamSplitter(double powerTransmission) {
++    public IdealTwoPortBeamSplitter {
++        if (!Double.isFinite(powerTransmission)
++                || powerTransmission < 0 || powerTransmission > 1) {
++            throw new IllegalArgumentException("power transmission must be in [0,1]");
++        }
++    }
++
++    public double powerReflection() {
++        return 1.0 - powerTransmission;
++    }
++
++    public record Ports(ParaxialModeField output0, ParaxialModeField output1) {
++        public Ports {
++            if (output0 == null || output1 == null) {
++                throw new IllegalArgumentException("both output ports required");
++            }
++        }
++        public double totalPowerWatts() {
++            return output0.powerWatts() + output1.powerWatts();
++        }
++    }
++
++    /** One populated classical input; the other is an empty classical mode. Quantum vacuum noise is not modeled. */
++    public Ports split(ParaxialModeField incident) {
++        if (incident == null) throw new IllegalArgumentException("input required");
++        return scatter(incident, incident.zeroLike());
++    }
++
++    /** Two coherent, matched input modes at the same reference plane. */
++    public Ports scatter(ParaxialModeField input0, ParaxialModeField input1) {
++        if (input0 == null || !input0.sameModeAs(input1)) {
++            throw new IllegalArgumentException("both coherent input modes must match exactly");
++        }
++        ComplexAmplitude transmission = new ComplexAmplitude(Math.sqrt(powerTransmission), 0);
++        ComplexAmplitude reflection = new ComplexAmplitude(0, Math.sqrt(powerReflection()));
++        JonesVector a = input0.modalAmplitudeSqrtWatts();
++        JonesVector b = input1.modalAmplitudeSqrtWatts();
++        JonesVector out0 = a.times(transmission).plus(b.times(reflection));
++        JonesVector out1 = a.times(reflection).plus(b.times(transmission));
++        return new Ports(input0.withModalAmplitude(out0), input0.withModalAmplitude(out1));
++    }
++}
+--- D6/physics-core/src/main/java/dev/coldatomcraft/physics/optics/OpticalPathTrace.java
++++ D7/physics-core/src/main/java/dev/coldatomcraft/physics/optics/OpticalPathTrace.java
+@@ -0,0 +1,72 @@
++package dev.coldatomcraft.physics.optics;
++
++import java.util.ArrayList;
++import java.util.List;
++
++/**
++ * Immutable single-branch optical-mode history. Splitting/recombination is
++ * deliberately performed by IdealTwoPortBeamSplitter, outside this linear
++ * path chain, so neither output port can be silently discarded.
++ *
++ * <p>Removed optical power is a tracked-mode deficit only. It is NOT an
++ * absorption, local heating or Minecraft damage assignment.</p>
++ */
++public record OpticalPathTrace(ParaxialModeField current, List<Step> steps) {
++    public record Step(String operation, ParaxialModeField input,
++                       ParaxialModeField output, double powerRemovedFromModeWatts) {
++        public Step {
++            if (operation == null || operation.isBlank() || input == null || output == null
++                    || !Double.isFinite(powerRemovedFromModeWatts)
++                    || powerRemovedFromModeWatts < 0) {
++                throw new IllegalArgumentException("valid path step required");
++            }
++        }
++    }
++
++    public OpticalPathTrace {
++        if (current == null || steps == null || steps.stream().anyMatch(s -> s == null)) {
++            throw new IllegalArgumentException("optical state and steps required");
++        }
++        steps = List.copyOf(steps);
++    }
++
++    public static OpticalPathTrace start(ParaxialModeField initial) {
++        return new OpticalPathTrace(initial, List.of());
++    }
++
++    private OpticalPathTrace append(String kind, ParaxialModeField next) {
++        double before = current.powerWatts();
++        double after = next.powerWatts();
++        double removed = Math.max(0.0, before - after);
++        var history = new ArrayList<>(steps);
++        history.add(new Step(kind, current, next, removed));
++        return new OpticalPathTrace(next, history);
++    }
++
++    public OpticalPathTrace freeSpace(double distanceMeters) {
++        return append("FREE_SPACE", current.freeSpace(distanceMeters));
++    }
++
++    public OpticalPathTrace thinLens(double focalLengthMeters, double onAxisPhaseRadians) {
++        return append("THIN_LENS", current.thinLens(focalLengthMeters, onAxisPhaseRadians));
++    }
++
++    public OpticalPathTrace phaseShift(double phaseRadians) {
++        return append("CALIBRATED_PHASE", current.withUniformPhaseRadians(phaseRadians));
++    }
++
++    public OpticalPathTrace idealMirrorPhaseOnly(double coatingAndPathPhaseRadians) {
++        return append("MIRROR_PHASE_PROXY",
++                current.withIdealMirrorReferencePhaseRadians(coatingAndPathPhaseRadians));
++    }
++
++    public OpticalPathTrace passiveJones(JonesMatrix jones) {
++        return append("PASSIVE_JONES", current.throughPassiveJones(jones));
++    }
++
++    public double totalRemovedFromTrackedModeWatts() {
++        double total = 0;
++        for (Step step : steps) total += step.powerRemovedFromModeWatts();
++        return total;
++    }
++}
+--- D6/physics-core/src/main/java/dev/coldatomcraft/physics/optics/ParaxialModeField.java
++++ D7/physics-core/src/main/java/dev/coldatomcraft/physics/optics/ParaxialModeField.java
+@@ -0,0 +1,179 @@
++package dev.coldatomcraft.physics.optics;
++
++/**
++ * Complex modal amplitudes (sqrt(W)) for one matched, transverse TEM00 mode
++ * at one reference plane in vacuum. The full optical carrier phase is in the
++ * Jones amplitudes; the q parameter contains the spatial envelope/curvature.
++ *
++ * <p>This is a declared mode, not a physical ray geometry, port location,
++ * server authority, or coherent-source measurement. Both reference keys must
++ * be supplied by an external laboratory calibration. No world effects.</p>
++ *
++ * <p>With exp(-i omega t), the transverse field is proportional to
++ * a*sqrt(2/(pi*w^2))*exp(-r^2/w^2)*exp(+i*k*r^2/(2*R)).
++ * A free-space step L advances the modal phase by
++ * k*L + arg(q_in*) - arg(q_out*), while preserving its power.</p>
++ */
++public record ParaxialModeField(String phaseReferenceKey,
++                                String modeFrameKey,
++                                double vacuumWavelengthMeters,
++                                GaussianQ q,
++                                JonesVector modalAmplitudeSqrtWatts) {
++    public ParaxialModeField {
++        if (phaseReferenceKey == null || phaseReferenceKey.isBlank()
++                || modeFrameKey == null || modeFrameKey.isBlank()
++                || !Double.isFinite(vacuumWavelengthMeters)
++                || vacuumWavelengthMeters <= 0 || q == null
++                || modalAmplitudeSqrtWatts == null) {
++            throw new IllegalArgumentException("phase/mode keys, wavelength, q and amplitude required");
++        }
++        double power = modalAmplitudeSqrtWatts.squaredNorm();
++        double radius = q.radiusMeters(vacuumWavelengthMeters);
++        double peak = (2.0 / Math.PI) * (power / radius) / radius;
++        if (!Double.isFinite(peak)) {
++            throw new IllegalArgumentException("modal peak irradiance is not representable");
++        }
++    }
++
++    /** Create a field at an explicitly specified plane and phase origin. */
++    public static ParaxialModeField fromPlane(String phaseReferenceKey,
++                                              String modeFrameKey,
++                                              GaussianPlane plane,
++                                              JonesVector unitPolarization,
++                                              double phaseRadiansAtPlane) {
++        if (plane == null || unitPolarization == null) {
++            throw new IllegalArgumentException("plane and normalized Jones polarization required");
++        }
++        double norm = unitPolarization.squaredNorm();
++        if (Math.abs(norm - 1.0) > 1e-12) {
++            throw new IllegalArgumentException("incident Jones polarization must have unit power");
++        }
++        JonesVector modal = unitPolarization.scale(Math.sqrt(plane.powerWatts()))
++                .times(ComplexAmplitude.fromPhaseRadians(phaseRadiansAtPlane));
++        return new ParaxialModeField(phaseReferenceKey, modeFrameKey,
++                plane.vacuumWavelengthMeters(), plane.q(), modal);
++    }
++
++    public double powerWatts() {
++        return modalAmplitudeSqrtWatts.squaredNorm();
++    }
++
++    public GaussianPlane gaussianPlane() {
++        return new GaussianPlane(powerWatts(), vacuumWavelengthMeters, q);
++    }
++
++    public ParaxialModeField zeroLike() {
++        return new ParaxialModeField(phaseReferenceKey, modeFrameKey,
++                vacuumWavelengthMeters, q,
++                new JonesVector(ComplexAmplitude.ZERO, ComplexAmplitude.ZERO));
++    }
++
++    /**
++     * A numerical precision diagnostic, NOT a measurement uncertainty:
++     * carrier-phase radians corresponding to one floating-point ULP of a
++     * supplied optical path length. A relative interferometer requiring
++     * tighter phase resolution must use a calibrated path-length/phase input,
++     * not infer sub-wavelength detail from imprecise world coordinates.
++     */
++    public double inputPathUlpPhaseRadians(double distanceMeters) {
++        if (!Double.isFinite(distanceMeters) || distanceMeters < 0) {
++            throw new IllegalArgumentException("nonnegative finite optical path required");
++        }
++        return 2.0 * Math.PI * (Math.ulp(distanceMeters) / vacuumWavelengthMeters);
++    }
++
++    /** Reference-plane intensity-equivalent Jones field in sqrt(W/m^2). */
++    public JonesVector fieldAtRadiusMeters(double radiusMeters) {
++        if (!Double.isFinite(radiusMeters) || radiusMeters < 0) {
++            throw new IllegalArgumentException("finite nonnegative radius required");
++        }
++        double width = q.radiusMeters(vacuumWavelengthMeters);
++        double normalizedRadius = radiusMeters / width;
++        double envelope = (Math.sqrt(2.0 / Math.PI) / width)
++                * Math.exp(-normalizedRadius * normalizedRadius);
++        if (envelope == 0) {
++            return new JonesVector(ComplexAmplitude.ZERO, ComplexAmplitude.ZERO);
++        }
++        // For q=x+i*y, 1/R=x/(x*x+y*y). Factorization avoids squaring
++        // either a large x or y and preserves the correct lens phase.
++        double h = Math.hypot(q.realMeters(), q.imaginaryMeters());
++        double curvature = Math.PI * (radiusMeters / vacuumWavelengthMeters)
++                * (radiusMeters / h) * (q.realMeters() / h);
++        ComplexAmplitude factor = ComplexAmplitude.fromPhaseRadians(curvature).scale(envelope);
++        return modalAmplitudeSqrtWatts.times(factor);
++    }
++
++    /** Physical forward travel along the current local axis; no world geometry. */
++    public ParaxialModeField freeSpace(double distanceMeters) {
++        if (!Double.isFinite(distanceMeters) || distanceMeters < 0) {
++            throw new IllegalArgumentException("nonnegative finite forward optical path required");
++        }
++        GaussianQ outQ = ParaxialAbcd.freeSpace(distanceMeters).transform(q);
++        // q*=x-i*y. At the waist the change is -atan(L/zR), i.e. Gouy.
++        // Keeping it as a difference of atan2 angles handles waist crossings.
++        double gouyPhaseIncrement = Math.atan2(q.imaginaryMeters(), outQ.realMeters())
++                - Math.atan2(q.imaginaryMeters(), q.realMeters());
++        // Modular reduction is an improvement, not a promise to reconstruct
++        // sub-wavelength precision lost in the caller's input distance.
++        double carrierCyclesFraction = Math.IEEEremainder(distanceMeters,
++                vacuumWavelengthMeters) / vacuumWavelengthMeters;
++        double phase = 2.0 * Math.PI * carrierCyclesFraction + gouyPhaseIncrement;
++        return withQAndModalAmplitude(outQ,
++                modalAmplitudeSqrtWatts.times(ComplexAmplitude.fromPhaseRadians(phase)));
++    }
++
++    /** Thin lossless lens: q changes; on-axis phase at the same plane does not. */
++    public ParaxialModeField thinLens(double focalLengthMeters,
++                                     double calibratedOnAxisPhaseRadians) {
++        GaussianQ outQ = ParaxialAbcd.thinLens(focalLengthMeters).transform(q);
++        return withQAndModalAmplitude(outQ,
++                modalAmplitudeSqrtWatts.times(
++                        ComplexAmplitude.fromPhaseRadians(calibratedOnAxisPhaseRadians)));
++    }
++
++    /** Explicit optical-path phase; no inference from coating or thickness. */
++    public ParaxialModeField withUniformPhaseRadians(double phaseRadians) {
++        return withQAndModalAmplitude(q,
++                modalAmplitudeSqrtWatts.times(ComplexAmplitude.fromPhaseRadians(phaseRadians)));
++    }
++
++    /**
++     * Ideal fold-mirror phase proxy ONLY: no direction change, Fresnel
++     * coefficients, s/p basis transport, or actual world reflection geometry.
++     * The coating/port phase must be an explicit laboratory input.
++     */
++    public ParaxialModeField withIdealMirrorReferencePhaseRadians(double phaseRadians) {
++        return withUniformPhaseRadians(phaseRadians);
++    }
++
++    /** Uniform passive Jones element; any gain for this actual input is rejected. */
++    public ParaxialModeField throughPassiveJones(JonesMatrix matrix) {
++        if (matrix == null) throw new IllegalArgumentException("Jones matrix required");
++        JonesVector out = matrix.apply(modalAmplitudeSqrtWatts);
++        double before = powerWatts();
++        double after = out.squaredNorm();
++        if ((before == 0 && after != 0)
++                || (before > 0 && after / before > 1.0 + 1e-12)) {
++            throw new IllegalArgumentException("active Jones gain is not an allowed passive element");
++        }
++        return withQAndModalAmplitude(q, out);
++    }
++
++    /** Only one identical, collinear modal basis can be coherently recombined. */
++    public boolean sameModeAs(ParaxialModeField other) {
++        return other != null
++                && phaseReferenceKey.equals(other.phaseReferenceKey)
++                && modeFrameKey.equals(other.modeFrameKey)
++                && Double.compare(vacuumWavelengthMeters, other.vacuumWavelengthMeters) == 0
++                && q.equals(other.q);
++    }
++
++    ParaxialModeField withModalAmplitude(JonesVector amplitude) {
++        return withQAndModalAmplitude(q, amplitude);
++    }
++
++    private ParaxialModeField withQAndModalAmplitude(GaussianQ updatedQ, JonesVector amplitude) {
++        return new ParaxialModeField(phaseReferenceKey, modeFrameKey,
++                vacuumWavelengthMeters, updatedQ, amplitude);
++    }
++}
+--- D6/physics-core/src/test/java/dev/coldatomcraft/physics/optics/IdealTwoPortBeamSplitterTest.java
++++ D7/physics-core/src/test/java/dev/coldatomcraft/physics/optics/IdealTwoPortBeamSplitterTest.java
+@@ -0,0 +1,142 @@
++package dev.coldatomcraft.physics.optics;
++
++import org.junit.jupiter.api.Test;
++import static org.junit.jupiter.api.Assertions.*;
++
++class IdealTwoPortBeamSplitterTest {
++    private static final double P=0.02;
++    private static ParaxialModeField input() { return ParaxialModeFieldTest.start(); }
++    private static void close(double a, double b) {
++        assertEquals(a,b,Math.max(1e-13,Math.abs(a)*1e-11));
++    }
++
++    @Test void onePortSplitConservesPowerAtEveryTransmission() {
++        for (double t:new double[]{0,0.01,0.25,0.5,0.8,0.999,1.0}) {
++            var ports=new IdealTwoPortBeamSplitter(t).split(input());
++            close(P*t,ports.output0().powerWatts());
++            close(P*(1-t),ports.output1().powerWatts());
++            close(P,ports.totalPowerWatts());
++        }
++    }
++
++    @Test void splitterReflectionIsInQuadratureWithTransmission() {
++        var ports=new IdealTwoPortBeamSplitter(0.5).split(input());
++        close(Math.sqrt(P/2),ports.output0().modalAmplitudeSqrtWatts().x().real());
++        close(0,ports.output0().modalAmplitudeSqrtWatts().x().imaginary());
++        close(0,ports.output1().modalAmplitudeSqrtWatts().x().real());
++        close(Math.sqrt(P/2),ports.output1().modalAmplitudeSqrtWatts().x().imaginary());
++    }
++
++    @Test void phaseDependentTwoPortInterferencePreservesTotalPower() {
++        var splitter=new IdealTwoPortBeamSplitter(0.5);
++        for (double delta:new double[]{0,Math.PI/7,Math.PI/3,Math.PI/2,Math.PI}) {
++            var second=input().withUniformPhaseRadians(delta);
++            var ports=splitter.scatter(input(),second);
++            close(2*P,ports.totalPowerWatts());
++            close(P*(1-Math.sin(delta)),ports.output0().powerWatts());
++            close(P*(1+Math.sin(delta)),ports.output1().powerWatts());
++        }
++    }
++
++    @Test void balancedMachZehnderRoutesAllPowerToOnePortWhenArmsMatch() {
++        var splitter=new IdealTwoPortBeamSplitter(0.5);
++        var arms=splitter.split(input());
++        var output=splitter.scatter(arms.output0().freeSpace(0.2),
++                arms.output1().freeSpace(0.2));
++        close(0,output.output0().powerWatts());
++        close(P,output.output1().powerWatts());
++        close(P,output.totalPowerWatts());
++    }
++
++    @Test void machZehnderPhaseShiftMovesBrightPortContinuously() {
++        var splitter=new IdealTwoPortBeamSplitter(0.5);
++        var arms=splitter.split(input());
++        for(double delta:new double[]{0,Math.PI/6,Math.PI/3,Math.PI/2,Math.PI}) {
++            var out=splitter.scatter(arms.output0().freeSpace(0.2),
++                    arms.output1().freeSpace(0.2).withUniformPhaseRadians(delta));
++            close(P*Math.pow(Math.sin(delta/2),2),out.output0().powerWatts());
++            close(P*Math.pow(Math.cos(delta/2),2),out.output1().powerWatts());
++            close(P,out.totalPowerWatts());
++        }
++    }
++
++    @Test void twoPortComplexJonesPolarizationIsMixedWithoutFlattening() {
++        var splitter=new IdealTwoPortBeamSplitter(0.5);
++        var h=input();
++        var v=h.withModalAmplitude(new JonesVector(ComplexAmplitude.ZERO,
++                h.modalAmplitudeSqrtWatts().x()));
++        var outputs=splitter.scatter(h,v);
++        close(P,outputs.output0().powerWatts());
++        close(P,outputs.output1().powerWatts());
++        close(2*P,outputs.totalPowerWatts());
++        close(0,outputs.output0().modalAmplitudeSqrtWatts().x().imaginary());
++        close(Math.sqrt(P/2),outputs.output0().modalAmplitudeSqrtWatts().y().imaginary());
++    }
++
++    @Test void mismatchedQCannotBeSilentlyCollapsedIntoSingleGaussian() {
++        var splitter=new IdealTwoPortBeamSplitter(0.5);
++        assertThrows(IllegalArgumentException.class,()->splitter.scatter(input(),
++                input().freeSpace(0.001)));
++        assertThrows(IllegalArgumentException.class,()->splitter.scatter(input(),
++                input().thinLens(0.25,0)));
++    }
++
++    @Test void incoherentPhaseReferenceCannotBeCombinedAsCoherentFields() {
++        var b=input();
++        var other=new ParaxialModeField("different-source",b.modeFrameKey(),
++                b.vacuumWavelengthMeters(),b.q(),b.modalAmplitudeSqrtWatts());
++        assertThrows(IllegalArgumentException.class,()->new IdealTwoPortBeamSplitter(0.5)
++                .scatter(b,other));
++    }
++
++    @Test void differentModeFramesAndCarrierWavelengthMustBeRejected() {
++        var b=input();
++        var frame=new ParaxialModeField(b.phaseReferenceKey(),"different-frame",
++                b.vacuumWavelengthMeters(),b.q(),b.modalAmplitudeSqrtWatts());
++        var wavelength=new ParaxialModeField(b.phaseReferenceKey(),b.modeFrameKey(),
++                781e-9,b.q(),b.modalAmplitudeSqrtWatts());
++        var splitter=new IdealTwoPortBeamSplitter(0.5);
++        assertThrows(IllegalArgumentException.class,()->splitter.scatter(b,frame));
++        assertThrows(IllegalArgumentException.class,()->splitter.scatter(b,wavelength));
++    }
++
++    @Test void twoIndependentPhysicalSourcesAreNotAutomaticallyCoherent() {
++        var splitter=new IdealTwoPortBeamSplitter(0.5);
++        var b=input();
++        var outside=new ParaxialModeField("independent-laser",b.modeFrameKey(),
++                b.vacuumWavelengthMeters(),b.q(),b.modalAmplitudeSqrtWatts());
++        assertThrows(IllegalArgumentException.class,()->splitter.scatter(b,outside));
++    }
++
++    @Test void deterministicComplexPolarizationStressConservesTwoPortPower() {
++        var random=new java.util.Random(20261026L);
++        var standard=input();
++        for (int i=0;i<400;i++) {
++            var a=new JonesVector(new ComplexAmplitude(random.nextDouble(),random.nextDouble()),
++                    new ComplexAmplitude(random.nextDouble(),random.nextDouble()));
++            var b=new JonesVector(new ComplexAmplitude(random.nextDouble(),random.nextDouble()),
++                    new ComplexAmplitude(random.nextDouble(),random.nextDouble()));
++            var left=standard.withModalAmplitude(a);
++            var right=standard.withModalAmplitude(b);
++            var result=new IdealTwoPortBeamSplitter(random.nextDouble()).scatter(left,right);
++            close(left.powerWatts()+right.powerWatts(),result.totalPowerWatts());
++        }
++    }
++
++    @Test void nonBalancedMachZehnderStillConservesBothOutputs() {
++        var splitter=new IdealTwoPortBeamSplitter(0.3);
++        var arms=splitter.split(input());
++        var output=splitter.scatter(arms.output0(),arms.output1());
++        close(P*0.16,output.output0().powerWatts());
++        close(P*0.84,output.output1().powerWatts());
++        close(P,output.totalPowerWatts());
++    }
++
++    @Test void noNegativeTransmissionOrNullInputIsAccepted() {
++        assertThrows(IllegalArgumentException.class,()->new IdealTwoPortBeamSplitter(-0.001));
++        assertThrows(IllegalArgumentException.class,()->new IdealTwoPortBeamSplitter(1.001));
++        assertThrows(IllegalArgumentException.class,()->new IdealTwoPortBeamSplitter(Double.NaN));
++        assertThrows(IllegalArgumentException.class,()->new IdealTwoPortBeamSplitter(0.5).split(null));
++        assertThrows(IllegalArgumentException.class,()->new IdealTwoPortBeamSplitter(0.5).scatter(input(),null));
++    }
++}
+--- D6/physics-core/src/test/java/dev/coldatomcraft/physics/optics/OpticalPathTraceTest.java
++++ D7/physics-core/src/test/java/dev/coldatomcraft/physics/optics/OpticalPathTraceTest.java
+@@ -0,0 +1,45 @@
++package dev.coldatomcraft.physics.optics;
++
++import org.junit.jupiter.api.Test;
++import static org.junit.jupiter.api.Assertions.*;
++
++class OpticalPathTraceTest {
++    private static void close(double a,double b) {
++        assertEquals(a,b,1e-11*Math.max(1,Math.abs(a)));
++    }
++    @Test void orderedOpticalTrainPreservesHistoryAndPowerBudget() {
++        var base=OpticalPathTrace.start(ParaxialModeFieldTest.start());
++        var train=base.freeSpace(0.1).thinLens(0.3,0)
++                .passiveJones(JonesMatrix.idealLinearPolarizer(Math.PI/4))
++                .freeSpace(0.2).idealMirrorPhaseOnly(0.3).phaseShift(-0.1);
++        assertEquals(0,base.steps().size());
++        assertEquals(6,train.steps().size());
++        close(0.02,train.steps().get(0).input().powerWatts());
++        close(0.01,train.current().powerWatts());
++        close(0.01,train.totalRemovedFromTrackedModeWatts());
++        assertEquals("MIRROR_PHASE_PROXY",train.steps().get(4).operation());
++        assertThrows(UnsupportedOperationException.class,()->train.steps().clear());
++    }
++    @Test void idealOpticsDoNotRemovePowerFromTheTrackedMode() {
++        var trace=OpticalPathTrace.start(ParaxialModeFieldTest.start())
++                .freeSpace(0.25).thinLens(0.4,0)
++                .passiveJones(JonesMatrix.quarterWave(0))
++                .idealMirrorPhaseOnly(Math.PI/3);
++        close(0,trace.totalRemovedFromTrackedModeWatts());
++        close(0.02,trace.current().powerWatts());
++    }
++    @Test void arbitraryJonesGainIsRejectedNotCountedAsNegativeLoss() {
++        var trace=OpticalPathTrace.start(ParaxialModeFieldTest.start());
++        var gain=new JonesMatrix(new ComplexAmplitude(3,0),ComplexAmplitude.ZERO,
++                ComplexAmplitude.ZERO,ComplexAmplitude.ONE);
++        assertThrows(IllegalArgumentException.class,()->trace.passiveJones(gain));
++    }
++    @Test void twoPortSplitterIsDeliberatelySeparateFromSingleBranchTrace() {
++        var arms=new IdealTwoPortBeamSplitter(0.5)
++                .split(OpticalPathTrace.start(ParaxialModeFieldTest.start()).current());
++        var branch0=OpticalPathTrace.start(arms.output0()).freeSpace(0.1);
++        var branch1=OpticalPathTrace.start(arms.output1()).freeSpace(0.1);
++        var out=new IdealTwoPortBeamSplitter(0.5).scatter(branch0.current(),branch1.current());
++        close(0.02,out.totalPowerWatts());
++    }
++}
+--- D6/physics-core/src/test/java/dev/coldatomcraft/physics/optics/ParaxialModeFieldTest.java
++++ D7/physics-core/src/test/java/dev/coldatomcraft/physics/optics/ParaxialModeFieldTest.java
+@@ -0,0 +1,150 @@
++package dev.coldatomcraft.physics.optics;
++
++import org.junit.jupiter.api.Test;
++import static org.junit.jupiter.api.Assertions.*;
++
++class ParaxialModeFieldTest {
++    private static final double LAMBDA=780e-9, W0=500e-6, POWER=0.02;
++    static ParaxialModeField start() {
++        var q = new GaussianQ(0,Math.PI*W0*W0/LAMBDA);
++        return ParaxialModeField.fromPlane("source-1","mode-frame-1",
++                new GaussianPlane(POWER,LAMBDA,q),JonesVector.horizontal(),0);
++    }
++    private static void close(double a,double b) {
++        assertEquals(a,b,1e-11*Math.max(1,Math.abs(a)));
++    }
++    private static void closeComplex(ComplexAmplitude a,ComplexAmplitude b) {
++        close(a.real(),b.real());close(a.imaginary(),b.imaginary());
++    }
++
++    @Test void constructorPreservesPowerAndPhaseAndNeedsNormalizedJones() {
++        var initial=start();
++        close(POWER,initial.powerWatts());
++        close(POWER,initial.gaussianPlane().powerWatts());
++        assertThrows(IllegalArgumentException.class,()->ParaxialModeField.fromPlane(
++                "x","frame",initial.gaussianPlane(),JonesVector.horizontal().scale(2),0));
++        assertThrows(IllegalArgumentException.class,()->new ParaxialModeField(
++                "","frame",LAMBDA,initial.q(),initial.modalAmplitudeSqrtWatts()));
++        assertThrows(IllegalArgumentException.class,()->new ParaxialModeField(
++                "source","",LAMBDA,initial.q(),initial.modalAmplitudeSqrtWatts()));
++        assertThrows(IllegalArgumentException.class,()->new ParaxialModeField(
++                "source","frame",-1,initial.q(),initial.modalAmplitudeSqrtWatts()));
++    }
++
++    @Test void freeSpaceRetainsPowerAndTransportsGaussianQ() {
++        var initial=start();double distance=0.35;
++        var advanced=initial.freeSpace(distance);
++        close(initial.powerWatts(),advanced.powerWatts());
++        close(distance,advanced.q().realMeters());
++        close(initial.q().imaginaryMeters(),advanced.q().imaginaryMeters());
++        close(initial.gaussianPlane().through(ParaxialAbcd.freeSpace(distance)).radiusMeters(),
++                advanced.gaussianPlane().radiusMeters());
++    }
++
++    @Test void freeSpaceAddsCarrierMinusGouyPhase() {
++        var initial=start();double distance=0.25;
++        var advanced=initial.freeSpace(distance);
++        double phase=2*Math.PI*(Math.IEEEremainder(distance,LAMBDA)/LAMBDA)
++                - Math.atan(distance/initial.q().imaginaryMeters());
++        ComplexAmplitude expected=ComplexAmplitude.fromPhaseRadians(phase).scale(Math.sqrt(POWER));
++        closeComplex(expected,advanced.modalAmplitudeSqrtWatts().x());
++        close(0,advanced.modalAmplitudeSqrtWatts().y().magnitudeSquared());
++    }
++
++    @Test void sequentialFreeSpaceAgreesWithSingleEquivalentPropagation() {
++        var initial=start();
++        var serial=initial.freeSpace(0.125).freeSpace(0.125);
++        var combined=initial.freeSpace(0.25);
++        close(serial.q().realMeters(),combined.q().realMeters());
++        close(serial.q().imaginaryMeters(),combined.q().imaginaryMeters());
++        closeComplex(serial.modalAmplitudeSqrtWatts().x(),combined.modalAmplitudeSqrtWatts().x());
++    }
++
++    @Test void gaussianPlaneFieldModulusMatchesIrradianceAtAnyRadius() {
++        var advanced=start().freeSpace(0.12);
++        double w=advanced.q().radiusMeters(LAMBDA);
++        for (double r:new double[]{0,w/5,w,3*w}) {
++            var sample=advanced.fieldAtRadiusMeters(r);
++            close(advanced.gaussianPlane().intensityWattsPerSquareMeter(r),
++                    sample.squaredNorm());
++        }
++    }
++
++    @Test void thinLensDoesNotInventOnAxisPhaseOrPowerAndChangesCurvature() {
++        var before=start().freeSpace(0.09);
++        var after=before.thinLens(0.2,0);
++        close(before.powerWatts(),after.powerWatts());
++        close(before.gaussianPlane().radiusMeters(),after.gaussianPlane().radiusMeters());
++        closeComplex(before.fieldAtRadiusMeters(0).x(),after.fieldAtRadiusMeters(0).x());
++        double r=W0*0.5;
++        double lensPhase=-Math.PI*r*r/(LAMBDA*0.2);
++        closeComplex(before.fieldAtRadiusMeters(r).x().times(
++                ComplexAmplitude.fromPhaseRadians(lensPhase)),after.fieldAtRadiusMeters(r).x());
++    }
++
++    @Test void lensRequiresSuppliedCommonPhaseWhenInterfering() {
++        var before=start();
++        var normal=before.thinLens(0.3,0);
++        var calibrated=before.thinLens(0.3,Math.PI);
++        close(normal.powerWatts(),calibrated.powerWatts());
++        closeComplex(normal.modalAmplitudeSqrtWatts().x().scale(-1),
++                calibrated.modalAmplitudeSqrtWatts().x());
++    }
++
++    @Test void passivePolarizerReducesTrackedModalPower() {
++        var before=start();
++        var after=before.throughPassiveJones(JonesMatrix.idealLinearPolarizer(Math.PI/4));
++        close(POWER*0.5,after.powerWatts());
++    }
++
++    @Test void quarterWaveAndHalfWaveKeepPowerAndRetainRelativePhase() {
++        var initial=ParaxialModeField.fromPlane("ref","frame",start().gaussianPlane(),
++                JonesVector.linearRadians(Math.PI/4),0);
++        var qwp=initial.throughPassiveJones(JonesMatrix.quarterWave(0));
++        close(initial.powerWatts(),qwp.powerWatts());
++        close(0,qwp.modalAmplitudeSqrtWatts().y().real());
++        close(Math.sqrt(POWER/2),qwp.modalAmplitudeSqrtWatts().y().imaginary());
++        var hwp=initial.throughPassiveJones(JonesMatrix.halfWave(0));
++        close(initial.powerWatts(),hwp.powerWatts());
++        close(-Math.sqrt(POWER/2),hwp.modalAmplitudeSqrtWatts().y().real());
++    }
++
++    @Test void passiveJonesRejectsGainAndPhasePreservesPower() {
++        var before=start();
++        var active=new JonesMatrix(new ComplexAmplitude(2,0),ComplexAmplitude.ZERO,
++                ComplexAmplitude.ZERO,ComplexAmplitude.ONE);
++        assertThrows(IllegalArgumentException.class,()->before.throughPassiveJones(active));
++        var phase=before.withUniformPhaseRadians(Math.PI/3);
++        close(before.powerWatts(),phase.powerWatts());
++        closeComplex(before.modalAmplitudeSqrtWatts().x().times(
++                ComplexAmplitude.fromPhaseRadians(Math.PI/3)),phase.modalAmplitudeSqrtWatts().x());
++    }
++
++    @Test void propagationPhaseUlpDiagnosticExposesInsufficientWorldCoordinatePrecision() {
++        var initial=start();
++        double resolution=initial.inputPathUlpPhaseRadians(0.125);
++        assertTrue(resolution > 0 && resolution < 1e-8);
++        assertTrue(initial.inputPathUlpPhaseRadians(1e12) > Math.PI);
++        assertThrows(IllegalArgumentException.class,
++                ()->initial.inputPathUlpPhaseRadians(Double.NaN));
++    }
++
++    @Test void zeroModeTravelsWithoutCreatingEnergyAndRetainsModeLabels() {
++        var zero=start().zeroLike();
++        assertEquals(0.0,zero.powerWatts(),0);
++        assertEquals(0.0,zero.freeSpace(0.2).thinLens(0.3,0).powerWatts(),0);
++        assertEquals(0.0,zero.fieldAtRadiusMeters(0).squaredNorm(),0);
++        assertTrue(start().sameModeAs(zero));
++    }
++
++    @Test void rejectsNegativeTravelAndInvalidSamplesAndPhases() {
++        var initial=start();
++        assertThrows(IllegalArgumentException.class,()->initial.freeSpace(-0.1));
++        assertThrows(IllegalArgumentException.class,()->initial.freeSpace(Double.NaN));
++        assertThrows(IllegalArgumentException.class,()->initial.fieldAtRadiusMeters(-1));
++        assertThrows(IllegalArgumentException.class,()->initial.thinLens(0,0));
++        assertThrows(IllegalArgumentException.class,()->initial.thinLens(0.2,Double.NaN));
++        assertThrows(IllegalArgumentException.class,()->initial.throughPassiveJones(null));
++        assertThrows(IllegalArgumentException.class,()->initial.withIdealMirrorReferencePhaseRadians(Double.POSITIVE_INFINITY));
++    }
++}
+--- D6/tools/verify-core.ps1
++++ D7/tools/verify-core.ps1
+@@ -8,6 +8,8 @@
+         Get-ChildItem (Join-Path $root 'experiment-core/src/main/java') -Filter '*.java' -Recurse | ForEach-Object { $_.FullName }
+         Join-Path $root 'verification/Smoke.java'
+         Join-Path $root 'verification/OpticsSmoke.java'
++        Join-Path $root 'verification/CoherentSmoke.java'
++        Join-Path $root 'verification/OpticalPathSmoke.java'
+     )
+     & javac --release 25 -encoding UTF-8 -d $tmp @sourcePaths
+     if ($LASTEXITCODE -ne 0) { throw 'javac failed' }
+@@ -15,6 +17,10 @@
+     if ($LASTEXITCODE -ne 0) { throw 'standalone smoke failed' }
+     & java -cp $tmp dev.coldatomcraft.verification.OpticsSmoke
+     if ($LASTEXITCODE -ne 0) { throw 'optics smoke failed' }
++    & java -cp $tmp dev.coldatomcraft.verification.CoherentSmoke
++    if ($LASTEXITCODE -ne 0) { throw 'coherent optics smoke failed' }
++    & java -cp $tmp dev.coldatomcraft.verification.OpticalPathSmoke
++    if ($LASTEXITCODE -ne 0) { throw 'optical-path smoke failed' }
+ } finally {
+     Remove-Item $tmp -Force -Recurse -ErrorAction SilentlyContinue
+ }
+--- D6/tools/verify-core.sh
++++ D7/tools/verify-core.sh
+@@ -4,9 +4,12 @@
+ TMP=$(mktemp -d)
+ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
+ find "$ROOT/physics-core/src/main/java" "$ROOT/experiment-core/src/main/java" -name '*.java' -print > "$TMP/sources.txt"
+-printf '%s\n' "$ROOT/verification/Smoke.java" "$ROOT/verification/OpticsSmoke.java" >> "$TMP/sources.txt"
++printf '%s\n' "$ROOT/verification/Smoke.java" "$ROOT/verification/OpticsSmoke.java" \
++  "$ROOT/verification/CoherentSmoke.java" "$ROOT/verification/OpticalPathSmoke.java" >> "$TMP/sources.txt"
+ mkdir -p "$TMP/classes"
+ javac --release 25 -encoding UTF-8 -d "$TMP/classes" @"$TMP/sources.txt"
+ java -cp "$TMP/classes" dev.coldatomcraft.verification.Smoke
+ 
+ java -cp "$TMP/classes" dev.coldatomcraft.verification.OpticsSmoke
++java -cp "$TMP/classes" dev.coldatomcraft.verification.CoherentSmoke
++java -cp "$TMP/classes" dev.coldatomcraft.verification.OpticalPathSmoke
+--- D6/tools/verify_m0.py
++++ D7/tools/verify_m0.py
+@@ -23,7 +23,7 @@
+ 
+ from inspect_mod_jar import inspect
+ 
+-MINIMUM_JUNIT_TEST_COUNT = 194  # D4 153 + D5 18 + D6 23 JUnit-source @Test methods
++MINIMUM_JUNIT_TEST_COUNT = 224  # D6 baseline 194 + D7 30 @Test methods
+ GRADLE_TASKS = (
+     "clean", ":physics-core:test", ":experiment-core:test",
+     ":neoforge-mod:build", ":neoforge-mod:verifyDistributableJar",
+@@ -98,7 +98,7 @@
+         source_root=str(root),
+         timestamp_utc=stamp,
+         os=platform.platform(),
+-        scope="M0-D6 source build/JUnit/JAR content only; NOT game startup or Owner signoff",
++        scope="M0-D7 source build/JUnit/JAR content only; NOT game startup or Owner signoff",
+         checks={},
+         actual_installed_jar_runtime="NOT RUN",
+         minecraft_client_runtime="NOT RUN",
+@@ -147,6 +147,7 @@
+             ("java25-smoke", smoke),
+             ("optics-high-precision-oracle", [sys.executable, "verification/M0-R2.1-D5/verify_optics_reference.py"]),
+             ("coherent-high-precision-oracle", [sys.executable, "verification/M0-R2.1-D6/verify_coherent_reference.py"]),
++            ("optical-path-high-precision-oracle", [sys.executable, "verification/M0-R2.1-D7/verify_optical_path_reference.py"]),
+             ("python-tests", [sys.executable, "-m", "unittest", "discover",
+                               "-s", "verification", "-p", "test_*.py", "-v"]),
+             ("asset-schema", [sys.executable, "tools/validate_assets.py",
+--- D6/verification/M0-R2.1-D7/OpticalPathReferenceProbe.java
++++ D7/verification/M0-R2.1-D7/OpticalPathReferenceProbe.java
+@@ -0,0 +1,57 @@
++import dev.coldatomcraft.physics.optics.*;
++
++/** Print actual Java scalars for an independent Decimal optical-path oracle. */
++public final class OpticalPathReferenceProbe {
++    private static final double LAMBDA=780e-9, W0=500e-6, POWER=0.02;
++    private static void emit(String label, double... values) {
++        System.out.print(label);
++        for (double value:values) System.out.print(","+Double.toString(value));
++        System.out.println();
++    }
++    private static ParaxialModeField input() {
++        var q=new GaussianQ(0, Math.PI*W0*W0/LAMBDA);
++        return ParaxialModeField.fromPlane("one-real-oscillator","aligned-transverse-mode",
++                new GaussianPlane(POWER,LAMBDA,q),JonesVector.horizontal(),0);
++    }
++    public static void main(String[] args) {
++        var beginning=input();
++        var propagated=beginning.freeSpace(0.125);
++        var a=propagated.modalAmplitudeSqrtWatts().x();
++        emit("free",propagated.q().realMeters(),propagated.q().imaginaryMeters(),
++                propagated.powerWatts(),a.real(),a.imaginary(),
++                propagated.fieldAtRadiusMeters(0.0001).squaredNorm());
++
++        var afterLens=beginning.freeSpace(0.15).thinLens(0.2,0);
++        var l=afterLens.modalAmplitudeSqrtWatts().x();
++        emit("lens",afterLens.q().realMeters(),afterLens.q().imaginaryMeters(),
++                l.real(),l.imaginary(),afterLens.fieldAtRadiusMeters(0.0001).squaredNorm());
++
++        var splitter=new IdealTwoPortBeamSplitter(0.3);
++        var split=splitter.split(beginning);
++        emit("split",split.output0().powerWatts(),split.output1().powerWatts(),
++                split.output0().modalAmplitudeSqrtWatts().x().real(),
++                split.output1().modalAmplitudeSqrtWatts().x().imaginary(),
++                split.totalPowerWatts());
++
++        var balanced=new IdealTwoPortBeamSplitter(0.5);
++        var arms=balanced.split(beginning);
++        var interferometer=balanced.scatter(arms.output0().freeSpace(0.125),
++                arms.output1().freeSpace(0.125).withUniformPhaseRadians(Math.PI/3));
++        var m0=interferometer.output0().modalAmplitudeSqrtWatts().x();
++        var m1=interferometer.output1().modalAmplitudeSqrtWatts().x();
++        emit("mach",interferometer.output0().powerWatts(),
++                interferometer.output1().powerWatts(),m0.real(),m0.imaginary(),
++                m1.real(),m1.imaginary(),interferometer.totalPowerWatts());
++
++        var diag=ParaxialModeField.fromPlane("one-real-oscillator","aligned-transverse-mode",
++                beginning.gaussianPlane(),JonesVector.linearRadians(Math.PI/4),0);
++        var qwp=diag.throughPassiveJones(JonesMatrix.quarterWave(0));
++        emit("qwp",qwp.powerWatts(),qwp.modalAmplitudeSqrtWatts().x().real(),
++                qwp.modalAmplitudeSqrtWatts().y().imaginary());
++
++        var path=OpticalPathTrace.start(beginning).freeSpace(0.1)
++                .thinLens(0.2,0).passiveJones(JonesMatrix.idealLinearPolarizer(Math.PI/4));
++        emit("trace",path.steps().size(),path.current().powerWatts(),
++                path.totalRemovedFromTrackedModeWatts());
++    }
++}
+--- D6/verification/M0-R2.1-D7/README.md
++++ D7/verification/M0-R2.1-D7/README.md
+@@ -0,0 +1,41 @@
++# D7 verification and provenance
++
++Source: `ColdAtomCraft-M0-R2.1-D6-DirectorCheckpoint.zip`
++
++SHA-256 of D6 input ZIP:
++`ee32c94ac0093cf170e7e32edddfc64196b8e86be03c4e2234803bfb2526a122`
++
++D6 input manifest: **267 / 267** entries matched on extraction. No input
++file was silently replaced with a guessed source. D7 changes are additive
++apart from documented validation-script and doc updates.
++
++## Tests executed on the local Linux JDK 21 host
++
++- `sh verification/M0-R2.1-D7/run_d7_offline.sh`:
++  previously existing smoke/asset checks, full reflection **NON-JUNIT** sweep;
++  D7 19-check optical path smoke; new 29 scalar Decimal80 oracle.
++- `javac --release 21 -Xlint:all` on pure production modules.
++- `python tools/verify_m0.py` checks for true JDK25 and is expected to
++  stop with `BLOCKED` on this host, without inventing a Gradle result.
++
++**The JUnit test sources are real JUnit 5 code, but this environment has
++not executed them under the JUnit Platform.** Do not count the older D6
++client/server logs as D7 runtime evidence.
++
++## Remaining verification
++
++On a Windows or Linux JDK25 build host with dependencies and NeoForge:
++
++```sh
++python tools/verify_m0.py
++```
++
++This executes JDK25 smoke, the D5/D6/D7 independent scientific oracles,
++asset tests, clean no-cache Gradle/JUnit, and distributable JAR inspection.
++It does **not** validate installed JAR in an independent Minecraft client
++or server. That last step requires a separate runtime session and logs.
++
++## Additional notes
++
++`source-diff.csv` / `source-diff.patch` and the SHA-256 manifest are
++regenerated at final packaging, after documentation and test changes.
+--- D6/verification/M0-R2.1-D7/run_d7_offline.sh
++++ D7/verification/M0-R2.1-D7/run_d7_offline.sh
+@@ -0,0 +1,16 @@
++#!/usr/bin/env sh
++# Standalone D7 scientific and engineering verification. NOT official JUnit.
++set -eu
++ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
++sh "$ROOT/verification/M0-R2.1-D6/run_d6_offline.sh"
++echo '=== D7 standalone 21-compatible physics smoke ==='
++TMP=$(mktemp -d)
++trap 'rm -rf "$TMP"' EXIT HUP INT TERM
++find "$ROOT/physics-core/src/main/java" -name '*.java' -print > "$TMP/sources.txt"
++printf '%s\n' "$ROOT/verification/OpticalPathSmoke.java" >> "$TMP/sources.txt"
++mkdir -p "$TMP/classes"
++javac --release 21 -encoding UTF-8 -d "$TMP/classes" @"$TMP/sources.txt"
++java -cp "$TMP/classes" dev.coldatomcraft.verification.OpticalPathSmoke
++echo '=== D7 independent 80-digit optical path oracle ==='
++python3 "$ROOT/verification/M0-R2.1-D7/verify_optical_path_reference.py"
++echo 'NOTICE: this script is an offline, non-JUnit verification only.'
+--- D6/verification/M0-R2.1-D7/verify_optical_path_reference.py
++++ D7/verification/M0-R2.1-D7/verify_optical_path_reference.py
+@@ -0,0 +1,173 @@
++#!/usr/bin/env python3
++"""Independent decimal(80 digits) phase/ABCD/Jones/two-port checks for D7.
++
++No third-party Python dependency, and not a formal JUnit or NeoForge test.
++Python reference uses high precision complex pairs and analytic formulae,
++not Java's floating point optical-path implementation.
++"""
++from __future__ import annotations
++
++from decimal import Decimal as D, localcontext, ROUND_HALF_EVEN
++from pathlib import Path
++import math
++import subprocess
++import tempfile
++
++ROOT=Path(__file__).resolve().parents[2]
++PI=D('3.14159265358979323846264338327950288419716939937510582097494459230781640628620899')
++LAMBDA=D.from_float(780e-9)
++W0=D.from_float(500e-6)
++POWER=D.from_float(0.02)
++
++
++def reduce(theta: D) -> D:
++    whole=(theta/(D(2)*PI)).to_integral_value(rounding=ROUND_HALF_EVEN)
++    return theta-whole*D(2)*PI
++
++
++def sine(theta: D) -> D:
++    theta=reduce(theta)
++    term=theta
++    value=theta
++    for n in range(1,160):
++        term *= -(theta*theta)/D((2*n)*(2*n+1))
++        value += term
++        if abs(term)<D('1e-76'):
++            return value
++    raise ArithmeticError('sine did not converge')
++
++
++def cosine(theta: D) -> D:
++    theta=reduce(theta)
++    term=D(1)
++    value=term
++    for n in range(1,160):
++        term *= -(theta*theta)/D((2*n-1)*(2*n))
++        value += term
++        if abs(term)<D('1e-76'):
++            return value
++    raise ArithmeticError('cosine did not converge')
++
++
++def atan_small(theta: D) -> D:
++    assert abs(theta)<D('0.3')
++    term=theta
++    value=D(0)
++    for i in range(220):
++        part=term/D(2*i+1)
++        value += part if i%2==0 else -part
++        if abs(part)<D('1e-76'):
++            return value
++        term *= theta*theta
++    raise ArithmeticError('atan did not converge')
++
++
++def modal_phase(distance: D, zr: D) -> D:
++    # Equivalent to the phase of q*_in/q*_out at the waist.
++    return reduce(D(2)*PI*distance/LAMBDA-atan_small(distance/zr))
++
++
++def cadd(a:tuple[D,D],b:tuple[D,D])->tuple[D,D]:
++    return (a[0]+b[0],a[1]+b[1])
++
++
++def cmul(a:tuple[D,D],b:tuple[D,D])->tuple[D,D]:
++    return (a[0]*b[0]-a[1]*b[1],a[0]*b[1]+a[1]*b[0])
++
++
++def phase(theta:D)->tuple[D,D]:
++    return (cosine(theta),sine(theta))
++
++
++def qlens(q:tuple[D,D],f:D)->tuple[D,D]:
++    # Independent q/(1-q/f) complex division.
++    x,y=q
++    p=D(1)-x/f
++    t=-y/f
++    denominator=p*p+t*t
++    return ((x*p+y*t)/denominator,(y*p-x*t)/denominator)
++
++
++def beam_intensity(q:tuple[D,D],r:D,power:D)->D:
++    x,y=q
++    w2=(LAMBDA/PI)*(x*x+y*y)/y
++    return D(2)*power/(PI*w2)*(-D(2)*r*r/w2).exp()
++
++
++def expected()->dict[str,list[D]]:
++    zr=PI*W0*W0/LAMBDA
++    amplitude=POWER.sqrt()
++    length=D.from_float(0.125)
++    phase_free=modal_phase(length,zr)
++    amp_free=(amplitude*cosine(phase_free),amplitude*sine(phase_free))
++    qfree=(length,zr)
++
++    lens_length=D.from_float(0.15)
++    q_after_lens=qlens((lens_length,zr),D.from_float(0.2))
++    lens_phase=modal_phase(lens_length,zr)
++    lens_amp=(amplitude*cosine(lens_phase),amplitude*sine(lens_phase))
++
++    t=D.from_float(0.3)
++    r=D(1)-t
++    split=(POWER*t,POWER*r,amplitude*t.sqrt(),amplitude*r.sqrt(),POWER)
++
++    half=(D(1)/D(2)).sqrt()
++    arm0=(amplitude*half,D(0))
++    arm1=(D(0),amplitude*half)
++    # Same free-space phase in both arms; second arm additionally +pi/3.
++    path_common=phase(phase_free)
++    arm0=cmul(arm0,path_common)
++    arm1=cmul(arm1,cmul(path_common,phase(PI/D(3))))
++    out0=cadd((arm0[0]*half,arm0[1]*half),(-arm1[1]*half,arm1[0]*half))
++    out1=cadd((-arm0[1]*half,arm0[0]*half),(arm1[0]*half,arm1[1]*half))
++
++    return {
++        'free':[length,zr,POWER,amp_free[0],amp_free[1],beam_intensity(qfree,D.from_float(0.0001),POWER)],
++        'lens':[q_after_lens[0],q_after_lens[1],lens_amp[0],lens_amp[1],
++                beam_intensity(q_after_lens,D.from_float(0.0001),POWER)],
++        'split':list(split),
++        'mach':[POWER/D(4),POWER*D(3)/D(4),out0[0],out0[1],out1[0],out1[1],POWER],
++        'qwp':[POWER,amplitude/D(2).sqrt(),amplitude/D(2).sqrt()],
++        'trace':[D(3),POWER/D(2),POWER/D(2)],
++    }
++
++
++def main()->None:
++    source_root=ROOT/'physics-core'/'src'/'main'/'java'
++    sources=sorted(source_root.rglob('*.java'))
++    probe=Path(__file__).with_name('OpticalPathReferenceProbe.java')
++    with tempfile.TemporaryDirectory(prefix='cac-d7-decimal-') as temp:
++        output=Path(temp)/'classes';output.mkdir()
++        subprocess.run(['javac','--release','21','-encoding','UTF-8','-d',str(output),
++                        *map(str,sources),str(probe)],check=True)
++        raw=subprocess.run(['java','-cp',str(output),'OpticalPathReferenceProbe'],
++                           check=True,capture_output=True,text=True).stdout
++    actual={}
++    for line in raw.splitlines():
++        name,*values=line.strip().split(',')
++        if name in actual:raise AssertionError(f'duplicate case {name}')
++        actual[name]=[float(value) for value in values]
++    with localcontext() as context:
++        context.prec=80
++        oracle=expected()
++        if actual.keys()!=oracle.keys():
++            raise AssertionError(f'case mismatch: {set(actual)^set(oracle)}')
++        total=0
++        for name,expected_values in oracle.items():
++            measured=actual[name]
++            if len(measured)!=len(expected_values):
++                raise AssertionError(f'{name} field count mismatch')
++            for index,(observed,reference) in enumerate(zip(measured,expected_values)):
++                # Inputs are the same exact binary64 values; require tight
++                # agreement with the independent 80-digit computation.
++                tolerance=max(5e-13,abs(float(reference))*3e-12)
++                if not math.isfinite(observed) or abs(observed-float(reference))>tolerance:
++                    raise AssertionError(f'{name}[{index}]: {observed} vs Decimal80 {reference}')
++                total+=1
++    print(f'PASS: {total} independent Decimal(80-digit) free-space, lens, Jones,')
++    print('two-port splitter, Mach-Zehnder and power-budget scalars')
++    print('NOT JDK25/Gradle/JUnit/NeoForge nor Owner-approved laser physics')
++
++
++if __name__=='__main__':
++    main()
+--- D6/verification/OpticalPathSmoke.java
++++ D7/verification/OpticalPathSmoke.java
+@@ -0,0 +1,64 @@
++package dev.coldatomcraft.verification;
++
++import dev.coldatomcraft.physics.optics.*;
++
++/** Standalone D7 optical path checks; dependency-free, not formal JUnit. */
++public final class OpticalPathSmoke {
++    private static int checks;
++    private static final double LAMBDA=780e-9, W0=500e-6, P=0.02;
++
++    private static void check(boolean condition, String label) {
++        checks++;
++        if (!condition) throw new AssertionError(label);
++    }
++
++    private static void near(double actual,double expected,String label) {
++        check(Math.abs(actual-expected)<1e-11*Math.max(1,Math.abs(expected)),label);
++    }
++
++    private static ParaxialModeField input() {
++        return ParaxialModeField.fromPlane("laser","matched-port-frame",
++                new GaussianPlane(P,LAMBDA,new GaussianQ(0,Math.PI*W0*W0/LAMBDA)),
++                JonesVector.horizontal(),0);
++    }
++
++    public static void main(String[] args) {
++        var first=input();
++        var traveled=first.freeSpace(0.125);
++        near(traveled.powerWatts(),P,"vacuum power");
++        near(traveled.q().realMeters(),0.125,"free space q");
++        near(traveled.q().imaginaryMeters(),first.q().imaginaryMeters(),"Rayleigh range");
++        near(traveled.fieldAtRadiusMeters(W0/5).squaredNorm(),
++                traveled.gaussianPlane().intensityWattsPerSquareMeter(W0/5),"field norm");
++        check(traveled.inputPathUlpPhaseRadians(0.125)>0,"phase path length diagnostic");
++        var lens=traveled.thinLens(0.2,0);
++        near(lens.powerWatts(),P,"lens power");
++        near(lens.gaussianPlane().radiusMeters(),traveled.gaussianPlane().radiusMeters(),"lens spot at plane");
++        var split=new IdealTwoPortBeamSplitter(0.5).split(first);
++        near(split.totalPowerWatts(),P,"both splitter outputs budget");
++        near(split.output0().powerWatts(),P/2,"first arm power");
++        near(split.output1().powerWatts(),P/2,"second arm power");
++        var recombined=new IdealTwoPortBeamSplitter(0.5)
++                .scatter(split.output0().freeSpace(0.125),split.output1().freeSpace(0.125));
++        near(recombined.output0().powerWatts(),0,"Mach-Zehnder dark port");
++        near(recombined.output1().powerWatts(),P,"Mach-Zehnder bright port");
++        var switched=new IdealTwoPortBeamSplitter(0.5)
++                .scatter(split.output0(),split.output1().withUniformPhaseRadians(Math.PI));
++        near(switched.output0().powerWatts(),P,"phase pi switches bright port");
++        near(switched.output1().powerWatts(),0,"phase pi switches dark port");
++        var path=OpticalPathTrace.start(first).freeSpace(0.1).thinLens(0.2,0)
++                .passiveJones(JonesMatrix.idealLinearPolarizer(Math.PI/4));
++        near(path.current().powerWatts(),P/2,"Malus law on path");
++        near(path.totalRemovedFromTrackedModeWatts(),P/2,"tracked mode budget");
++        check(path.steps().size()==3,"trace length");
++        boolean rejected=false;
++        try { new IdealTwoPortBeamSplitter(0.5).scatter(first,traveled); }
++        catch (IllegalArgumentException expected) { rejected=true; }
++        check(rejected,"unmatched Gaussian q rejected");
++        rejected=false;
++        try {first.freeSpace(-1);}
++        catch (IllegalArgumentException expected) { rejected=true; }
++        check(rejected,"negative propagation rejected");
++        System.out.println("PASS: " + checks + " D7 optical-path smoke checks (NOT JUnit / NeoForge)");
++    }
++}

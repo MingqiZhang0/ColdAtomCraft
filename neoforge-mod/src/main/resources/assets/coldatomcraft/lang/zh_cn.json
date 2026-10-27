@@ -1,0 +1,15 @@
+{
+  "itemGroup.coldatomcraft.lab_preview": "CAC 实验交互测试（开发）",
+  "block.coldatomcraft.diagnostic_laser": "测试激光器（占位模型）",
+  "block.coldatomcraft.diagnostic_power_meter": "测试光功率计（占位模型）",
+  "message.coldatomcraft.preview.laser_rotated": "[CAC 测试] 激光器转向：%s",
+  "message.coldatomcraft.preview.laser_on": "[CAC 测试] 激光器已开启（演示参数）",
+  "message.coldatomcraft.preview.laser_off": "[CAC 测试] 激光器已关闭",
+  "message.coldatomcraft.preview.aperture": "[CAC 测试] 探测孔径半径：%s mm",
+  "message.coldatomcraft.preview.reading": "[CAC 测试] 理想光功率：%s mW（间隔 %s 格）",
+  "message.coldatomcraft.preview.no_source": "[CAC 测试] 正前方 24 格内没有测试光源",
+  "message.coldatomcraft.preview.blocked": "[CAC 测试] 光路被非空气方块遮挡",
+  "message.coldatomcraft.preview.unloaded": "[CAC 测试] 光路进入未加载区块",
+  "message.coldatomcraft.preview.wrong_facing": "[CAC 测试] 激光器朝向错误",
+  "message.coldatomcraft.preview.shutter_closed": "[CAC 测试] 找到激光器，但快门关闭"
+}

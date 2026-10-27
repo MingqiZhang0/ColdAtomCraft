@@ -1,0 +1,1353 @@
+--- a/README.md
++++ b/README.md
+@@ -1,3 +1,41 @@
++# CAC-M0-R2.1-D3 — director engineering checkpoint (2026-10-26)
++
++**Status: pure-Java engineering checkpoint, NOT a NeoForge release; M0 remains open.**
++
++D3 addresses the **proven D2 cross-session apparatus/time collision** by requiring every new
++logical experiment session to atomically reserve a nonempty set of apparatus block positions
++for one *server-wide scheduling tick window*. Only one same-scheduler reservation may own
++an apparatus during overlapping windows. Overlap checks use per-apparatus ordered maps;
++multi-apparatus reservations are all-or-none. The previously unrestricted
++`createExperiment()` API was removed rather than leaving an easy bypass.
++
++An attempt may submit a candidate only from a reserved source apparatus and only when
++`ServerMutationFacts.currentServerTick` lies in the session's reserved half-open window.
++Simulation nanoseconds (`SimulationInterval`) are **not** identified with Minecraft ticks.
++Cancellation releases a session's reservations ONLY when no effect has ever been claimed;
++settlement history leaves an in-memory tombstone, including after FAILED.
++
++**D3 local evidence**: D2 RED reproduced (both duplicate sessions claimed); D3 Java21 pure
++core smoke **383/383 PASS**; existing and new Java methods **149/149 PASS in a NON-JUNIT
++offline reflection harness**; Python asset tests **17/17 PASS**. Formal JDK25 Gradle/JUnit,
++NeoForge build, distributable JAR, D3 game runtime and production world adapter are
++**NOT RUN / NOT IMPLEMENTED**. Historical R2 runtime tests do not validate D3.
++
++**Strict scope**: All D3 reservations, tick facts and ownership handles are ordinary Java
++objects, not server-authenticated proof. Two `ExperimentRunScheduler` instances or a caller
++fabricating device/time claims can bypass the in-memory separation; a real server adapter
++must own the *single* authoritative scheduler per scheduling domain, validate the entire
++world state, model, device, target, permissions and tick on the server thread, and choose a
++crash/restart recovery policy before any actual world mutation. No Owner physical model was
++created or modified, and no Blender asset was fabricated.
++
++See [D3 audit](docs/M0_R2_1_D3_AUDIT.md), [D3 evidence](verification/M0-R2.1-D3/README.md),
++and the [world interaction contract](docs/WORLD_INTERACTION_CONTRACT.md).
++
++---
++
++## Historical D2 README (the below section is not D3 validation)
++
+ # Cold Atom Craft (CAC)
+ 
+ **Status: M0-R2.1-D2 code director checkpoint, 2026-10-26 — NOT a release; M0 remains open.**
+--- a/docs/ARCHITECTURE.md
++++ b/docs/ARCHITECTURE.md
+@@ -1,3 +1,25 @@
++# D3 architecture change — in-memory apparatus lease gate
++
++`ExperimentRunScheduler.createExperiment(ExperimentReservation)` atomically records
++`(dimension,blockX,blockY,blockZ)` apparatus occupancy for a common half-open
++`ServerTickWindow` using per-key `TreeMap` floor/ceiling conflict checks.
++Multiple optical devices can be reserved as one all-or-none group. Claimed session
++windows remain in-memory tombstones; unclaimed whole-session cancellation releases
++all keys and invalidates attempts. The removed no-argument session API prevents
++bypass through another session in a single scheduler instance.
++
++Before calling the existing world/coordinator claim path, the scheduler verifies
++that the candidate source device lies in the reserved apparatus set and that
++`ServerMutationFacts.currentServerTick` lies in the reserved scheduling window.
++This is **not** a proof of ServerLevel origin; no production adapter exists yet.
++A future single authoritative server allocator is required, with persistent
++recovery policy, actual world-authoritative apparatus ownership and current clock.
++Solver time in nanoseconds is independent of server scheduling ticks.
++
++Historical R2/D1/D2 architecture descriptions below remain for provenance.
++
++---
++
+ # CAC M0-R2.1-D2 architectural delta
+ 
+ - `WorldEffectLedger.claim` now checks a secondary `(runId,stepIndex,eventIndex)` uniqueness index, independent of model provenance. Full `TransferEventKey` remains for outcome lookup and audit.
+--- a/docs/CHANGELOG.md
++++ b/docs/CHANGELOG.md
+@@ -1,4 +1,15 @@
+ # Changelog
++
++## M0-R2.1-D3 · 2026-10-26 · Director in-memory scheduling contract checkpoint
++
++- Reproduced D2 failure: independently created sessions can claim same apparatus/physical operation.
++- Added mandatory immutable `ExperimentReservation`, `ApparatusKey` and `ServerTickWindow`.
++- Updated scheduler to atomically reserve multi-apparatus server-tick windows with an indexed overlap check, removed unrestricted no-argument session creation.
++- Added unclaimed full-session cancellation with fail-closed claim/history tombstones; retry keeps existing reservations.
++- Bound candidate source apparatus and server tick into submit preconditions (`ServerMutationFacts` now carries currentServerTick).
++- Added 18 JUnit-source regression methods in ExperimentReservationTest (existing 9 ExperimentRunSchedulerTest methods updated as necessary), while preserving historical testing scope.
++- Current-host Java21 engineering smoke 383/383; 149/149 NON-JUNIT test method sweep; Python 17/17.
++- JDK25 Gradle/JUnit, NeoForge build, D3 runtime, and live server adapter **NOT RUN**. No Owner models or gameplay changes.
+ 
+ ## M0-R2.1-D2 · 2026-10-26 · Director checkpoint (NOT a release)
+ 
+--- a/docs/DECISIONS.md
++++ b/docs/DECISIONS.md
+@@ -1,3 +1,19 @@
++## D3 engineering decision — 2026-10-26
++
++- Mandatory per-session **apparatus/operation tick-window reservation** in the pure Java
++  scheduler, with no public unrestricted session-creation bypass. The server-wide tick
++  window and solver nanoseconds are independent clocks. Competing reservations in one
++  scheduler instance fail atomically; known claimed histories retain an in-memory tombstone.
++- Cancellation and reuse of a reserved apparatus/window are permitted only before ANY claim.
++  The old attempt cannot submit after cancellation. A failure or APPLIED outcome never
++  grants automatic replay of the identical reserved physical interval.
++- Two schedulers and forged/non-authoritative scheduling records remain an explicit hazard;
++  no actual NeoForge integration, persistent release protocol, or gameplay/world effect is
++  authorized. Gating this type in pure Java does **not** mean world delivery is safe.
++- Owner retains physics, Blender and release approvals. D3 is NOT a final M0 closure.
++
++---
++
+ # Director decision record: CAC-M0-R2.1-D2 (2026-10-26)
+ 
+ **D2-01:** Require uniqueness of each `(runId,stepIndex,eventIndex)` event slot independent of model ID/revision, preserving model provenance in the original TransferEventKey. Motivated by an actual D1 two-claim reproduction.
+--- /dev/null
++++ b/docs/M0_R2_1_D3_AUDIT.md
+@@ -0,0 +1,88 @@
++# CAC M0-R2.1-D3 — Independent code director audit
++
++**Date:** 2026-10-26  
++**Input:** `ColdAtomCraft-M0-R2.1-D2-DirectorCheckpoint.zip`  
++**Scope:** Minecraft-independent physical apparatus reservation and inter-session scheduling window invariants; no scientific model or real game mutation.  
++**Status:** ENGINEERING CHECKPOINT; **M0 NOT CLOSED**.
++
++## 1. Freeze and evidence
++
++- D2 archive extracted into a separate immutable base directory; verified **179/179 SHA-256 entries** against the archive's manifest before edits.
++- D2 RED reproduction compiled/runs against frozen D2 main source (JDK21): two independent logical sessions both return `CLAIMED` for the same apparatus/simulation interval. Log: `verification/M0-R2.1-D3/logs/d2-resource-conflict-red.log`.
++- Baseline D2 source is not rewritten; D3 source lives in a separately named directory. D2 red probe source is archived as `.java.d2-only.txt` and is intentionally not part of D3's compilation.
++
++## 2. Root problem
++
++D2 `ExperimentRunScheduler.createExperiment()` allocated a session without any apparatus/physical-operation identity or scheduling window. The fact that UUIDs differed allowed independent sessions to reserve the same solver-time slice and both claim world effects. Per-run event-slot deduplication was insufficient because run identities differed.
++
++**Important limit:** the original RED fixture's shared solver-time interval is not proof of a shared *real-world clock*. D3 adds a distinct server scheduling window to make cross-session conflict checks well-defined. No server adapter yet binds these requests to live devices or a reliable clock.
++
++## 3. D3 implementation
++
++1. Added `ApparatusKey`: dimension plus device block coordinates. Device ID is deliberately omitted, so replacing an apparatus at the same block position cannot evade a pending reservation.
++2. Added `ServerTickWindow`: half-open `[startTick,endTick)` on **one server-wide scheduling timeline**, separate from `SimulationInterval` in numerical nanoseconds. Intervals touching at one endpoint do not overlap.
++3. Added `ExperimentReservation`: canonical immutable nonempty apparatus set plus scheduling window, with a direct source-device membership predicate.
++4. Changed `ExperimentRunScheduler.createExperiment` to require a reservation. The no-argument API was intentionally removed to eliminate the obvious no-reservation bypass. Allocation checks all keys and refuses the entire request if any overlaps; a TreeMap floor/ceiling check indexes ordered windows per apparatus.
++5. Added `cancelUnclaimedSession`: invalidates stale attempt and releases **all** reserved apparatus keys only when no event has ever been CLAIMED. Attempt retries preserve the original lease. Claimed sessions (even when FAILED) keep their windows as conservative in-memory tombstones.
++6. Extended `ServerMutationFacts` with `currentServerTick`; scheduler submission rejects a candidate whose source position is not in the reserved apparatus set or whose current tick lies outside its reserved scheduling window. This is a breaking pure-Java API change: the record now accepts seven components instead of six. The provided bool/tick record does not prove the data originated from `ServerLevel`.
++7. Updated existing scheduler JUnit-source tests and standalone Smoke to use the mandatory reservation contract. Added `ExperimentReservationTest` with 18 independent JUnit-source methods, testing overlap, boundaries, atomic multi-device conflict, disjoint/multiple dimensions, replacement device identity, cancellation, retry, claim tombstones, synthetic clock constraints, deterministic random interval-oracle agreement, concurrent allocation and cancel/claim arbitration. No new `ModelApproval.OWNER_APPROVED` entries in production.
++
++## 4. Re-verified evidence (current D3 source)
++
++| Verification | Status | Evidence / limitations |
++| --- | --- | --- |
++| D2 frozen archive manifest | **PASS 179/179** | SHA-256 verified at extraction |
++| D2 cross-session collision | **RED REPRODUCED** | `logs/d2-resource-conflict-red.log` |
++| D3 pure Java compile and engineering smoke (JDK 21) | **PASS 383/383** | `logs/java21-smoke.log`, `logs/local-offline-all.log` |
++| Java test methods with historical custom assertions runner | **PASS 149/149, NOT JUNIT** | `logs/java21-offline-sweep.log`, `logs/local-offline-all.log` |
++| Python asset tests | **PASS 17/17** | `logs/python-assets.log`, `logs/local-offline-all.log` |
++| Deterministic index oracle and concurrency regressions | **PASS under offline runner** | Included in 149; no formal JUnit engine was available |
++| Reservation microbenchmark | **OBSERVATIONAL** | `logs/reservation-benchmark-java21.log` and `docs/PERFORMANCE_AUDIT.md` |
++| JDK25 + official Gradle / JUnit5 on D3 | **NOT RUN** | Only JDK21 installed; external artifact repositories unreachable |
++| NeoForge D3 build + distributable JAR verification | **NOT RUN** | Requires official JDK25, NeoForge/Gradle dependencies |
++| D3 client/dedicated server/save reload | **NOT RUN** | No D3 NeoForge JAR produced; R2 historic runtime != D3 evidence |
++| Installed production JAR in isolated instance | **NOT RUN** | Same blocker |
++| Single authoritative NeoForge scheduler and world/tick provenance | **NOT IMPLEMENTED** | Pure Java objects cannot establish server trust |
++| Crash-safe world effect delivery / persistent leases | **NOT IMPLEMENTED** | In-memory only; no cross-restart exactly-once |
++| Model formulas, Owner Blender assets, laser/thermal/biological effects | **NOT IMPLEMENTED / BLOCKED** | Science/assets remain Owner-controlled |
++
++No GPU/GLB renderer, weapon/damage logic or speculative atomic-physics calculations were introduced.
++
++## 5. Security and delivery semantics
++
++- **Safety within one scheduler instance:** overlapping server-tick reservation windows for any common apparatus block position cannot be allocated twice, and reserve-all-or-none is synchronized. Old attempts from cancelled sessions cannot submit. A claim keeps an in-memory tombstone; time ranges can overlap only for different physical device positions or across deliberately nonoverlapping windows.
++- **Not guaranteed:** the existence/trustworthiness of the apparatus, authenticity of `currentServerTick`, shared clock epochs/dimension consistency, no overlap across separate scheduler instances or process restarts, persistent reservations, absence of claim→mutate race, completeness of optical-path apparatus set, world-change revision tracking, permissions and gameplay mutation atomicity.
++- **Known bypass:** separate independently instantiated schedulers can each reserve the same apparatus and window. An adversarial caller that supplies fabricated device, window or tick facts also bypasses the *pure-Java* record predicates. These are explicitly outside D3's current guarantee and must be closed by one future server-owned NeoForge adapter before world effects are enabled.
++- **Failure policy:** `CLAIMED` is not `APPLIED`; `FAILED` may already have partially modified world. Neither allows automatic replay. Cancelled unclaimed sessions may free leases because they have never obtained an effect claim. No crash-safe exactly-once is promised.
++
++## 6. Migration and integration handoff
++
++**Breaking signatures:**
++
++```java
++// D2 (unsafe; no longer available)
++ExperimentRunScheduler.StartedSession created = scheduler.createExperiment();
++ServerMutationFacts facts = new ServerMutationFacts(true, true, true, true, true, true);
++
++// D3 (pure-Java contract; authoritative input is NOT yet implemented)
++ExperimentReservation reservation = ExperimentReservation.single(
++    new ApparatusKey("minecraft:overworld", 8, 64, 8),
++    new ServerTickWindow(1000, 1020));
++ExperimentRunScheduler.CreateOutcome allocated = scheduler.createExperiment(reservation);
++ServerMutationFacts newFacts = new ServerMutationFacts(true, true, true, true, true, true, 1001);
++```
++
++Future DeepSeek/NeoForge responsibilities: create a SINGLE trusted scheduler per server allocation domain; derive `ApparatusKey` from `ServerLevel` block entity state; define one stable trusted server tick/epoch; validate all reserved and dependent apparatus and permissions immediately before mutation; ensure each real effect's mutation tick is inside the lease; reject untrusted client requests; establish pending/claim/settlement persistence and recovery; handle apparatus unload or movement; add server TPS and soak tests. Without this no production damage or world mutations may be enabled.
++
++## 7. Performance and retention
++
++The indexed lease check is expected **O(k log n)** for `k` reserved apparatus and up to `n` intervals per apparatus, excluding UUID overhead, with linear-memory retained leases and sessions. Pure Java microbenchmark medians for 1k/10k/50k session allocations were **7.745 / 18.863 / 63.165 ms**, with noisy outliers. The corresponding study and sample list are in `docs/PERFORMANCE_AUDIT.md`. No server TPS, solver performance or long-running world retention was measured; do not compare directly with D2's *different* ledger-step benchmark.
++
++## 8. Director Gate disposition
++
++- **D3 local contract / pure Java:** CONDITIONAL PASS (JDK21 compile + standalone + offline assertions).
++- **D3 formal JDK25 Gradle/JUnit and NeoForge runtime:** NOT RUN; cannot promote historical R2 PASS.
++- **Production server-world effects:** NOT IMPLEMENTED; forbidden until authoritative ServerLevel adapter and gameplay delivery agreement exist.
++- **M0 overall:** **OPEN**, awaiting formal toolchain verification and Owner signoff.
++
++**Next recommended task:** obtain JDK25/Gradle Maven access and run an actual *fresh D3* clean build, JUnit, `verifyDistributableJar`, dedicated-server/client smoke and isolated installed JAR validation; independently review the one-server allocator and crash/recovery policy before enabling OPT-001 in the world.
+--- /dev/null
++++ b/docs/M0_R2_1_D3_CHANGED_FILES.md
+@@ -0,0 +1,34 @@
++# D2 → D3 changed source and documentation files
++
++Frozen base: `ColdAtomCraft-M0-R2.1-D2-DirectorCheckpoint.zip` (179/179 checksum match).
++Comparison excludes historical `verification/M0-*`, `MANIFEST_SHA256.txt`, and generated caches;
++`verification/Smoke.java` is included.
++
++**Counts:** 6 added, 15 modified, 0 removed.
++
++Machine-readable hashes: `verification/M0-R2.1-D3/source-diff.csv`.
++Reviewable patch: `verification/M0-R2.1-D3/d2-to-d3-source.patch`.
++
++| Path | Change |
++| --- | --- |
++| `README.md` | MODIFIED |
++| `docs/ARCHITECTURE.md` | MODIFIED |
++| `docs/CHANGELOG.md` | MODIFIED |
++| `docs/DECISIONS.md` | MODIFIED |
++| `docs/M0_R2_1_D3_AUDIT.md` | ADDED |
++| `docs/M0_R2_1_D3_CHANGED_FILES.md` | ADDED |
++| `docs/PERFORMANCE_AUDIT.md` | MODIFIED |
++| `docs/RUN_ON_WINDOWS.md` | MODIFIED |
++| `docs/TEST_PLAN.md` | MODIFIED |
++| `docs/WORLD_INTERACTION_CONTRACT.md` | MODIFIED |
++| `experiment-core/src/main/java/dev/coldatomcraft/experiment/world/ApparatusKey.java` | ADDED |
++| `experiment-core/src/main/java/dev/coldatomcraft/experiment/world/ExperimentReservation.java` | ADDED |
++| `experiment-core/src/main/java/dev/coldatomcraft/experiment/world/ExperimentRunScheduler.java` | MODIFIED |
++| `experiment-core/src/main/java/dev/coldatomcraft/experiment/world/ServerMutationFacts.java` | MODIFIED |
++| `experiment-core/src/main/java/dev/coldatomcraft/experiment/world/ServerTickWindow.java` | ADDED |
++| `experiment-core/src/test/java/dev/coldatomcraft/experiment/world/ContractTestSupport.java` | MODIFIED |
++| `experiment-core/src/test/java/dev/coldatomcraft/experiment/world/ExperimentReservationTest.java` | ADDED |
++| `experiment-core/src/test/java/dev/coldatomcraft/experiment/world/ExperimentRunSchedulerTest.java` | MODIFIED |
++| `experiment-core/src/test/java/dev/coldatomcraft/experiment/world/ServerEffectCommitCoordinatorTest.java` | MODIFIED |
++| `experiment-core/src/test/java/dev/coldatomcraft/experiment/world/ServerEffectGateTest.java` | MODIFIED |
++| `verification/Smoke.java` | MODIFIED |
+--- a/docs/PERFORMANCE_AUDIT.md
++++ b/docs/PERFORMANCE_AUDIT.md
+@@ -1,3 +1,38 @@
++# D3 resource-reservation performance addendum (2026-10-26)
++
++`ExperimentRunScheduler.createExperiment(ExperimentReservation)` now performs a
++per-apparatus `TreeMap` predecessor/successor overlap check and inserts a lease
++only if ALL requested apparatus are conflict-free. For `k` requested apparatus
++and up to `n` windows per apparatus, expected worst-case within one scheduler:
++**O(k log n)** index work, plus set validation, session issuance and UUID cost.
++Claim operations are unchanged except for the apparatus set lookup and server-tick
++containment check. The scheduler monitor serializes these short operations;
++callers must not execute expensive physics or `ServerLevel` mutations under it.
++
++Current-host OpenJDK 21 microbenchmark, `-Xmx1g`, five trials per size after
++three 1,000-session warmups; each session reserves ONE common apparatus at a
++disjoint window `[2*i,2*i+1)`. The benchmark includes UUID generation, Java
++allocation and creation of an in-memory session/attempt + lease index. These
++measurements are **observational**, not representative of optics workloads or
++Minecraft TPS.
++
++| Accepted reservations | Five-run median |
++| --- | ---: |
++| 1,000 | 7.745 ms |
++| 10,000 | 18.863 ms |
++| 50,000 | 63.165 ms |
++
++The samples show JIT/GC outliers (see
++`verification/M0-R2.1-D3/logs/reservation-benchmark-java21.log`); we make NO
++claim of statistically established speedup, server tick latency bound, or
++sufficient heap lifetime. A claimed session's reservation is intentionally
++retained as an in-memory tombstone to prevent replay; **memory increases with
++all distinct claims** until lifecycle and durable retention policies are
++approved. Server-wide clock/identity validation and crash recovery are still
++NOT IMPLEMENTED.
++
++---
++
+ # D2 performance addendum — JDK 21 synthetic comparison
+ 
+ The D1 vs D2 5-trial benchmark was run on the **same available Linux JDK 21 machine**, not in Minecraft. Median results (ms): register 1,000: 1.735 vs 1.532; register 10,000: 6.752 vs 6.614; register 50,000: 30.394 vs 27.841; 20,000 claim+mark: 10.272 vs 4.783. Some claim trials had long GC/JIT-influenced tails, so the measurements **do not establish a speedup or performance regression**. The extra EventSlot map requires additional memory per claimed event. No TPS or persistent-world performance test was run. Raw logs: `verification/M0-R2.1-D2/performance/`.
+--- a/docs/RUN_ON_WINDOWS.md
++++ b/docs/RUN_ON_WINDOWS.md
+@@ -1,3 +1,35 @@
++# D3 Windows build/review gate (not yet executed for D3)
++
++The current D3 source was checked offline with Linux JDK21; to **actually** validate
++Minecraft Java 26.3 + NeoForge 26.3.0.99, extract the final D3 ZIP into a fresh
++folder on a Windows machine with JDK25 and network access to official Gradle/
++NeoForge repositories. Run from the project root:
++
++```powershell
++java -version
++.\gradlew.bat --version
++.\gradlew.bat clean :physics-core:test :experiment-core:test :neoforge-mod:build --no-build-cache --rerun-tasks
++.\gradlew.bat :neoforge-mod:verifyDistributableJar
++```
++
++These commands are **instructions, not completed D3 evidence**. Record full logs,
++JUnit XMLs and the distributable JAR SHA-256, then perform new D3 development-client
++and dedicated-server launch/snapshot tests. A cleanly built D3 JAR must still be
++installed in an isolated production instance to earn that separate validation.
++Only logs from these exact D3 bytes count; historical R2 build and screenshots do
++not validate the new scheduler. The trusted NeoForge ServerLevel integration and
++world mutation are NOT IMPLEMENTED in this checkpoint.
++
++Important API migration: `ExperimentRunScheduler.createExperiment()` now requires
++an `ExperimentReservation` and returns `CreateOutcome`; `ServerMutationFacts`
++requires the server-authoritative tick as a seventh component. Do NOT synthesize
++that tick or apparatus identity from client network traffic; until the future
++server adapter is built, use these APIs only for pure Java tests/research.
++
++---
++
++## Archived Windows setup guide (historical)
++
+ # M0 verification on Windows
+ 
+ ## 1. Install and verify tools
+--- a/docs/TEST_PLAN.md
++++ b/docs/TEST_PLAN.md
+@@ -1,3 +1,26 @@
++# D3 validation status — 2026-10-26
++
++| Check | Result |
++| --- | --- |
++| Frozen D2 SHA256 manifest | PASS 179/179 |
++| D2 duplicate-session event claim | RED REPRODUCED (2 CLAIMED) |
++| D3 atomic apparatus/time reservation and tick-window regression | PASS in offline harness |
++| Java 21 core compile + smoke | PASS 383/383 |
++| JUnit-source methods via independent reflection/assertion shim | PASS 149/149 — **NOT JUNIT** |
++| Python assets | PASS 17/17 |
++| Reservation microbenchmark | OBSERVATIONAL, results in D3 evidence |
++| JDK25/Gradle 9.2.1 real JUnit run | NOT RUN |
++| NeoForge D3 build + distributable JAR | NOT RUN |
++| D3 installed game/client/server test | NOT RUN |
++| Live `ServerLevel` authority and effect mutation | NOT IMPLEMENTED |
++
++**WARNING:** D2/R2 historical build/client logs remain archived but are not D3 execution
++proof. See [D3 audit](M0_R2_1_D3_AUDIT.md) and D3 `verification/` README.
++
++---
++
++## Historical test plans
++
+ # CAC M0-R2.1-D2 test status (2026-10-26)
+ 
+ | D2 test | Status | Detail |
+--- a/docs/WORLD_INTERACTION_CONTRACT.md
++++ b/docs/WORLD_INTERACTION_CONTRACT.md
+@@ -1,3 +1,38 @@
++# D3 addendum — apparatus reservation and two clocks (2026-10-26)
++
++**Implemented in the pure Java scheduler:** session creation requires `ExperimentReservation`,
++containing one or more `ApparatusKey` locations and a half-open `ServerTickWindow`.
++Same-scheduler overlapping requests for any common apparatus are rejected before any lease
++is inserted; accepted windows are indexed by start tick per apparatus for logarithmic
++neighbor lookup. Unclaimed session cancellation frees all its leases and fences its old
++attempt. An already CLAIMED event leaves the session's leased time window as an in-memory
++tombstone, even after `markFailed`. Retry within one session retains its original lease.
++
++**Two time meanings must never be conflated:** `ServerTickWindow` uses a single trusted
++server-wide scheduling clock in ticks. `CalculationStep.interval()` holds simulation-time
++nanoseconds. Their endpoints must NOT be compared directly. The scheduler checks
++`ServerMutationFacts.currentServerTick` at submission; its record is a data carrier and cannot
++attest that this tick actually came from the server. The real adapter must obtain and recheck
++that tick immediately before application.
++
++**Boundaries:** apparatus reservation only checks source apparatus and the keys declared by
++its trusted future server adapter. The current implementation has NO live `ServerLevel`
++identity capture, no enforced uniqueness across multiple scheduler instances or reboots,
++no durable reservation persistence, no automatic TTL reclamation of claimed lease history,
++no protection when a client/server falsely declares the scheduling time or device, and no
++permission to mutate the world. The bare public Ledger/Coordinator are still internal
++building blocks in practice; future production adapters MUST NOT expose them as alternative
++commit paths. Apparatus locations alone cannot substitute for future device UUID, chunk
++load epochs, placement change events, or actual optical-path dependency tracking.
++
++Cancellation after any settlement claim is conservatively denied; legitimate later
++operations can reserve **nonoverlapping** tick windows. The absence of real device clock
++validation means D3 is a server integration *contract*, NOT a solved world security layer.
++
++---
++
++## D2 historical contract (the text below predates D3)
++
+ # M0-R2.1-D2 world-interaction contract addendum
+ 
+ ## D2 provenance-independent event uniqueness
+--- /dev/null
++++ b/experiment-core/src/main/java/dev/coldatomcraft/experiment/world/ApparatusKey.java
+@@ -0,0 +1,21 @@
++package dev.coldatomcraft.experiment.world;
++
++/**
++ * Physical location of an apparatus, independent of its model/device ID.
++ * A block replacement at the same position MUST NOT bypass a reservation.
++ * The dimension key and block coordinates must be obtained from trusted
++ * ServerLevel state by the future NeoForge adapter, not a client packet.
++ */
++public record ApparatusKey(String dimension, int blockX, int blockY, int blockZ) {
++    public ApparatusKey {
++        if (dimension == null || dimension.isBlank()) {
++            throw new IllegalArgumentException("apparatus dimension required");
++        }
++    }
++
++    public static ApparatusKey of(DeviceSnapshot device) {
++        if (device == null) throw new IllegalArgumentException("device required");
++        return new ApparatusKey(device.dimension(), device.blockX(),
++                device.blockY(), device.blockZ());
++    }
++}
+--- /dev/null
++++ b/experiment-core/src/main/java/dev/coldatomcraft/experiment/world/ExperimentReservation.java
+@@ -0,0 +1,32 @@
++package dev.coldatomcraft.experiment.world;
++
++import java.util.Set;
++
++/**
++ * Immutable request to reserve ALL apparatus positions over the same
++ * server-wide scheduling window. The scheduler uses an atomic all-or-none
++ * allocation: an experiment cannot reserve only a fraction of its apparatus.
++ *
++ * This record is NOT a capability/security proof. Only a future trusted
++ * server adapter may construct requests from live world state; clients must
++ * never be allowed to choose reservation windows or apparatus keys as authority.
++ */
++public record ExperimentReservation(Set<ApparatusKey> apparatus,
++                                    ServerTickWindow window) {
++    public ExperimentReservation {
++        if (apparatus == null || apparatus.isEmpty() || apparatus.stream().anyMatch(item -> item == null)
++                || window == null) {
++            throw new IllegalArgumentException("nonempty apparatus and server window required");
++        }
++        apparatus = Set.copyOf(apparatus);
++    }
++
++    public static ExperimentReservation single(ApparatusKey apparatus, ServerTickWindow window) {
++        if (apparatus == null) throw new IllegalArgumentException("apparatus required");
++        return new ExperimentReservation(Set.of(apparatus), window);
++    }
++
++    public boolean includes(DeviceSnapshot device) {
++        return device != null && apparatus.contains(ApparatusKey.of(device));
++    }
++}
+--- a/experiment-core/src/main/java/dev/coldatomcraft/experiment/world/ExperimentRunScheduler.java
++++ b/experiment-core/src/main/java/dev/coldatomcraft/experiment/world/ExperimentRunScheduler.java
+@@ -3,6 +3,10 @@
+ import dev.coldatomcraft.experiment.ModelCatalog;
+ 
+ import java.util.UUID;
++import java.util.HashMap;
++import java.util.Map;
++import java.util.NavigableMap;
++import java.util.TreeMap;
+ 
+ /**
+  * In-memory, server-intended *logical experiment* attempt fencing.
+@@ -16,24 +20,42 @@
+  * or outstanding CLAIMED outcomes may have affected the world.</p>
+  *
+  * <p>All state transitions here and in the owned ledger occur under this
+- * scheduler's monitor. No computation, game-world operation, network call or
++ * scheduler's monitor. Cross-session apparatus/time reservations are also
++ * guarded by the same monitor and are allocated atomically.
++ * No computation, game-world operation, network call or
+  * user callback is executed by this class. The underlying ledger is private:
+  * production code must not bypass the attempt fence by making direct claims.</p>
+  *
+  * <p><strong>Important limitations:</strong> this is ordinary pure Java code;
+  * construction and IDs do not prove a caller is a Minecraft server. The future
+  * NeoForge adapter must instantiate and invoke it only in a trusted server
+- * context. Creating another session for the
+- * same physical operation is NOT detected. Only the future authoritative game
+- * scheduler can define physical-operation identity, permissions, device/time
+- * ownership, and prevent overlapping independent sessions. The model and world
++ * context. This scheduler refuses overlapping server-tick windows for the same
++ * reserved apparatus block positions within its own instance; a separate
++ * scheduler, a forged scheduling window or a restarted JVM can still duplicate
++ * the physical operation. Only the future authoritative game adapter can bind
++ * reservations to live devices, one server clock and actual mutation time.
++ * The model and world
+  * snapshots passed to {@link #submit} remain caller-provided records; a real
+  * NeoForge adapter must capture them on the server thread immediately before
+  * mutation. No persistent or cross-restart exactly-once guarantee exists.</p>
+  */
+ public final class ExperimentRunScheduler {
++    public enum CreateStatus {
++        CREATED,
++        APPARATUS_WINDOW_CONFLICT,
++        INVALID_RESERVATION
++    }
++
++    public enum CancelStatus {
++        CANCELLED,
++        SESSION_CLOSED,
++        SETTLEMENT_HISTORY_PRESENT,
++        INVALID_SESSION
++    }
++
+     public enum RetryStatus {
+         STARTED,
++        SESSION_CLOSED,
+         ACTIVE_ATTEMPT,
+         SETTLEMENT_HISTORY_PRESENT,
+         INVALID_SESSION
+@@ -51,6 +73,8 @@
+         INVALID_ATTEMPT,
+         STALE_ATTEMPT,
+         FOREIGN_RUN,
++        FOREIGN_APPARATUS,
++        OUTSIDE_RESERVED_SERVER_WINDOW,
+         REJECTED_BY_COORDINATOR
+     }
+ 
+@@ -59,16 +83,24 @@
+         private final ExperimentRunScheduler owner;
+         private final String sessionId;
+         private Attempt current;
++        private final ExperimentReservation reservation;
++        private boolean closed;
+         private boolean claimedAny;
+         private long nextAttemptOrdinal;
+ 
+-        private Session(ExperimentRunScheduler owner, String sessionId) {
++        private Session(ExperimentRunScheduler owner, String sessionId,
++                        ExperimentReservation reservation) {
+             this.owner = owner;
+             this.sessionId = sessionId;
++            this.reservation = reservation;
+         }
+ 
+         public String sessionId() {
+             return sessionId;
++        }
++
++        public ExperimentReservation reservation() {
++            return reservation;
+         }
+     }
+ 
+@@ -100,6 +132,16 @@
+ 
+     public record StartedSession(Session session, Attempt attempt) { }
+ 
++    public record CreateOutcome(CreateStatus status, StartedSession started) {
++        public CreateOutcome {
++            if ((status == CreateStatus.CREATED) != (started != null)) {
++                throw new IllegalArgumentException("only CREATED carries a session");
++            }
++        }
++    }
++
++    private record Lease(Session session, ServerTickWindow window) { }
++
+     public record RetryOutcome(RetryStatus status, Attempt attempt) {
+         public RetryOutcome {
+             if ((status == RetryStatus.STARTED) != (attempt != null)) {
+@@ -117,6 +159,9 @@
+     }
+ 
+     private final WorldEffectLedger ledger = new WorldEffectLedger();
++    // Starts are unique per apparatus because overlapping windows are refused.
++    // Claimed sessions retain tombstones indefinitely; see retention policy docs.
++    private final Map<ApparatusKey, NavigableMap<Long, Lease>> reservations = new HashMap<>();
+     private final ServerEffectCommitCoordinator coordinator;
+ 
+     public ExperimentRunScheduler(ModelCatalog trustedCatalog) {
+@@ -126,17 +171,84 @@
+         coordinator = new ServerEffectCommitCoordinator(ledger, trustedCatalog);
+     }
+ 
+-    /** Allocates a new logical experiment and its first run entirely in-process. */
+-    public synchronized StartedSession createExperiment() {
+-        Session session = new Session(this, "cac-exp-" + UUID.randomUUID());
++    /**
++     * Reserves all required physical apparatus locations over a common server
++     * scheduling window (distinct from each solver's simulated nanoseconds).
++     * A conflict refuses the WHOLE allocation with no partial state changes.
++     * No unreserved/no-argument allocation API is provided, because it could
++     * bypass cross-session resource arbitration.
++     */
++    public synchronized CreateOutcome createExperiment(ExperimentReservation request) {
++        if (request == null) {
++            return new CreateOutcome(CreateStatus.INVALID_RESERVATION, null);
++        }
++        for (ApparatusKey key : request.apparatus()) {
++            NavigableMap<Long, Lease> timeline = reservations.get(key);
++            if (timeline == null) continue;
++            var lower = timeline.floorEntry(request.window().startTick());
++            var upper = timeline.ceilingEntry(request.window().startTick());
++            if ((lower != null && lower.getValue().window().overlaps(request.window()))
++                    || (upper != null && upper.getValue().window().overlaps(request.window()))) {
++                return new CreateOutcome(CreateStatus.APPARATUS_WINDOW_CONFLICT, null);
++            }
++        }
++        Session session = new Session(this, "cac-exp-" + UUID.randomUUID(), request);
+         Attempt attempt = issue(session);
+-        return new StartedSession(session, attempt);
++        for (ApparatusKey key : request.apparatus()) {
++            var timeline = reservations.computeIfAbsent(key, ignored -> new TreeMap<>());
++            Lease previous = timeline.put(request.window().startTick(),
++                    new Lease(session, request.window()));
++            if (previous != null) {
++                throw new IllegalStateException("duplicate apparatus lease start despite precheck");
++            }
++        }
++        return new CreateOutcome(CreateStatus.CREATED, new StartedSession(session, attempt));
++    }
++
++    /**
++     * Releases an entire unused session's apparatus reservations. If any event
++     * has ever been CLAIMED (including FAILED), its historical window remains
++     * reserved as an in-memory tombstone, even after application outcome.
++     * Cancel never changes ledger settlement state.
++     */
++    public synchronized CancelStatus cancelUnclaimedSession(Session session) {
++        if (!owns(session)) return CancelStatus.INVALID_SESSION;
++        if (session.closed) return CancelStatus.SESSION_CLOSED;
++        if (session.claimedAny) return CancelStatus.SETTLEMENT_HISTORY_PRESENT;
++        Attempt current = session.current;
++        if (current != null) {
++            var result = ledger.abandonRun(current.runId);
++            if (result == WorldEffectLedger.AbandonResult.HAS_SETTLEMENT_CLAIMS) {
++                return CancelStatus.SETTLEMENT_HISTORY_PRESENT;
++            }
++            if (result != WorldEffectLedger.AbandonResult.ABANDONED
++                    && result != WorldEffectLedger.AbandonResult.UNKNOWN_RUN) {
++                throw new IllegalStateException("unexpected ledger run state: " + result);
++            }
++            current.abandoned = true;
++            session.current = null;
++        }
++        for (ApparatusKey key : session.reservation.apparatus()) {
++            var timeline = reservations.get(key);
++            Lease existing = timeline == null ? null
++                    : timeline.get(session.reservation.window().startTick());
++            if (existing == null || existing.session() != session) {
++                throw new IllegalStateException("missing owned apparatus reservation");
++            }
++            timeline.remove(session.reservation.window().startTick());
++            if (timeline.isEmpty()) reservations.remove(key);
++        }
++        session.closed = true;
++        return CancelStatus.CANCELLED;
+     }
+ 
+     /** A second run of this experiment is allowed ONLY after unclaimed abandonment. */
+     public synchronized RetryOutcome retry(Session session) {
+         if (!owns(session)) {
+             return new RetryOutcome(RetryStatus.INVALID_SESSION, null);
++        }
++        if (session.closed) {
++            return new RetryOutcome(RetryStatus.SESSION_CLOSED, null);
+         }
+         if (session.current != null) {
+             return new RetryOutcome(RetryStatus.ACTIVE_ATTEMPT, null);
+@@ -209,6 +321,14 @@
+             return new Submission(candidate == null ? SubmissionStatus.INVALID_ATTEMPT
+                     : SubmissionStatus.FOREIGN_RUN, null);
+         }
++        if (!attempt.session.reservation.includes(candidate.sourceDevice())) {
++            return new Submission(SubmissionStatus.FOREIGN_APPARATUS, null);
++        }
++        if (facts == null || !attempt.session.reservation.window().contains(facts.currentServerTick())) {
++            return new Submission(facts == null ? SubmissionStatus.REJECTED_BY_COORDINATOR
++                    : SubmissionStatus.OUTSIDE_RESERVED_SERVER_WINDOW,
++                    facts == null ? ServerEffectCommitCoordinator.Decision.INVALID : null);
++        }
+         var result = coordinator.submit(candidate, precheck, current, facts);
+         if (result == ServerEffectCommitCoordinator.Decision.SETTLEMENT_CLAIMED) {
+             attempt.session.claimedAny = true;
+@@ -251,7 +371,8 @@
+     }
+ 
+     private boolean isCurrent(Attempt attempt) {
+-        return owns(attempt) && !attempt.abandoned && attempt.session.current == attempt;
++        return owns(attempt) && !attempt.session.closed && !attempt.abandoned
++                && attempt.session.current == attempt;
+     }
+ 
+     private static boolean belongsTo(Attempt attempt, TransferEventKey key) {
+--- a/experiment-core/src/main/java/dev/coldatomcraft/experiment/world/ServerMutationFacts.java
++++ b/experiment-core/src/main/java/dev/coldatomcraft/experiment/world/ServerMutationFacts.java
+@@ -6,7 +6,10 @@
+  * <p>Every value must be obtained from the authoritative server state on the
+  * server thread at mutation time. In particular, none of these facts may be
+  * deserialized from a client packet, a player save, or a candidate object. This
+- * record is an integration contract; the NeoForge adapter that captures the
++ * currentServerTick uses the same trusted server-wide scheduling clock as
++ * ServerTickWindow, NOT solver simulation nanoseconds. The value is supplied
++ * by the future trusted server adapter; this record cannot prove its source.
++ * This record is an integration contract; the NeoForge adapter that captures the
+  * facts is <strong>not implemented in M0-R2.1</strong>.</p>
+  */
+ public record ServerMutationFacts(
+@@ -15,5 +18,11 @@
+         boolean targetIdentityResolved,
+         boolean targetPositionCurrent,
+         boolean targetChunkLoaded,
+-        boolean permissionGranted) {
++        boolean permissionGranted,
++        long currentServerTick) {
++    public ServerMutationFacts {
++        if (currentServerTick < 0) {
++            throw new IllegalArgumentException("trusted current server tick must be nonnegative");
++        }
++    }
+ }
+--- /dev/null
++++ b/experiment-core/src/main/java/dev/coldatomcraft/experiment/world/ServerTickWindow.java
+@@ -0,0 +1,27 @@
++package dev.coldatomcraft.experiment.world;
++
++/**
++ * Half-open [startTick,endTick) interval in ONE trusted, server-wide
++ * operation-scheduling clock, NOT in solver nanoseconds and NOT in wall time.
++ *
++ * A future NeoForge adapter must define the epoch, ensure a common clock
++ * across dimension keys, and check the actual server application time against
++ * the reservation. Constructing this record does not establish authenticity.
++ * This in-memory type has no cross-restart or persistent clock semantics.
++ */
++public record ServerTickWindow(long startTick, long endTick) {
++    public ServerTickWindow {
++        if (startTick < 0 || endTick <= startTick) {
++            throw new IllegalArgumentException("window must satisfy 0 <= startTick < endTick");
++        }
++    }
++
++    public boolean contains(long serverTick) {
++        return serverTick >= startTick && serverTick < endTick;
++    }
++
++    public boolean overlaps(ServerTickWindow other) {
++        if (other == null) throw new IllegalArgumentException("window required");
++        return startTick < other.endTick && other.startTick < endTick;
++    }
++}
+--- a/experiment-core/src/test/java/dev/coldatomcraft/experiment/world/ContractTestSupport.java
++++ b/experiment-core/src/test/java/dev/coldatomcraft/experiment/world/ContractTestSupport.java
+@@ -25,7 +25,7 @@
+     static final ModelCatalog TEST_MODEL_CATALOG =
+             ModelCatalog.fromTrustedServerBootstrap(List.of(SYNTHETIC_APPROVED_MODEL));
+     static final ServerMutationFacts ALL_SERVER_FACTS =
+-            new ServerMutationFacts(true, true, true, true, true, true);
++            new ServerMutationFacts(true, true, true, true, true, true, 0);
+ 
+     private ContractTestSupport() { }
+ 
+--- /dev/null
++++ b/experiment-core/src/test/java/dev/coldatomcraft/experiment/world/ExperimentReservationTest.java
+@@ -0,0 +1,361 @@
++package dev.coldatomcraft.experiment.world;
++
++import org.junit.jupiter.api.Test;
++
++import java.util.ArrayList;
++import java.util.HashSet;
++import java.util.Random;
++import java.util.List;
++import java.util.Set;
++import java.util.concurrent.CountDownLatch;
++import java.util.concurrent.Executors;
++import java.util.concurrent.TimeUnit;
++
++import static dev.coldatomcraft.experiment.world.ContractTestSupport.*;
++import static org.junit.jupiter.api.Assertions.*;
++
++/** In-memory device/time reservation; NOT a NeoForge ServerLevel authority test. */
++class ExperimentReservationTest {
++    private static final ApparatusKey LASER = new ApparatusKey(
++            FakeWorldState.DIMENSION, FakeWorldState.DEVICE_X,
++            FakeWorldState.DEVICE_Y, FakeWorldState.DEVICE_Z);
++    private static final ApparatusKey MIRROR = new ApparatusKey(
++            FakeWorldState.DIMENSION, 20, 64, 8);
++    private static final ApparatusKey REMOTE = new ApparatusKey(
++            "minecraft:the_nether", 8, 64, 8);
++    private static final SimulationInterval SOLVER_INTERVAL = new SimulationInterval(0, 1_000);
++
++    private static ExperimentReservation single(ApparatusKey key, long startTick, long endTick) {
++        return ExperimentReservation.single(key, new ServerTickWindow(startTick, endTick));
++    }
++
++    private static ExperimentRunScheduler.StartedSession started(ExperimentRunScheduler scheduler,
++                                                                  ExperimentReservation reservation) {
++        var result = scheduler.createExperiment(reservation);
++        assertEquals(ExperimentRunScheduler.CreateStatus.CREATED, result.status());
++        return result.started();
++    }
++
++    @Test
++    void sameApparatusOverlappingWindowFailsBeforeAnyCalculationOrClaim() {
++        var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
++        started(scheduler, single(LASER, 10, 20));
++        var rejected = scheduler.createExperiment(single(LASER, 19, 30));
++        assertEquals(ExperimentRunScheduler.CreateStatus.APPARATUS_WINDOW_CONFLICT,
++                rejected.status());
++        assertTrue(rejected.started() == null);
++        assertEquals(0, scheduler.claimedTransferCount());
++    }
++
++    @Test
++    void intervalIndexHandlesOutOfOrderRequestsAndHalfOpenBoundaries() {
++        var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
++        started(scheduler, single(LASER, 20, 30));
++        started(scheduler, single(LASER, 0, 10));
++        assertEquals(ExperimentRunScheduler.CreateStatus.APPARATUS_WINDOW_CONFLICT,
++                scheduler.createExperiment(single(LASER, 5, 25)).status());
++        started(scheduler, single(LASER, 10, 20));
++        started(scheduler, single(LASER, 30, 40));
++        assertEquals(ExperimentRunScheduler.CreateStatus.APPARATUS_WINDOW_CONFLICT,
++                scheduler.createExperiment(single(LASER, 19, 21)).status());
++    }
++
++    @Test
++    void distinctDevicesMayShareAWindow() {
++        var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
++        started(scheduler, single(LASER, 10, 20));
++        started(scheduler, single(MIRROR, 10, 20));
++        started(scheduler, single(REMOTE, 10, 20));
++    }
++
++    @Test
++    void sameBlockWithReplacedDeviceIdCannotEvadeLease() {
++        var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
++        var world = new FakeWorldState();
++        started(scheduler, single(ApparatusKey.of(world.device()), 0, 10));
++        world.changeDeviceIdentity();
++        assertEquals(ExperimentRunScheduler.CreateStatus.APPARATUS_WINDOW_CONFLICT,
++                scheduler.createExperiment(single(ApparatusKey.of(world.device()), 0, 10)).status());
++    }
++
++    @Test
++    void multiApparatusConflictCausesNoPartialReservation() {
++        var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
++        started(scheduler, single(MIRROR, 10, 20));
++        var group = new ExperimentReservation(Set.of(LASER, MIRROR),
++                new ServerTickWindow(10, 20));
++        assertEquals(ExperimentRunScheduler.CreateStatus.APPARATUS_WINDOW_CONFLICT,
++                scheduler.createExperiment(group).status());
++        // If the failed multi-reservation inserted LASER prematurely, this would fail.
++        started(scheduler, single(LASER, 10, 20));
++    }
++
++    @Test
++    void cancelledUnclaimedSessionFreesWholeReservationAndFencesOldAttempt() {
++        var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
++        var req = new ExperimentReservation(Set.of(LASER, MIRROR), new ServerTickWindow(0, 10));
++        var created = started(scheduler, req);
++        var attempt = created.attempt();
++        assertEquals(WorldEffectLedger.BeginResult.STARTED,
++                scheduler.beginStep(attempt, 0, SOLVER_INTERVAL));
++        assertEquals(ExperimentRunScheduler.CancelStatus.CANCELLED,
++                scheduler.cancelUnclaimedSession(created.session()));
++        assertEquals(ExperimentRunScheduler.CancelStatus.SESSION_CLOSED,
++                scheduler.cancelUnclaimedSession(created.session()));
++        assertEquals(ExperimentRunScheduler.RetryStatus.SESSION_CLOSED,
++                scheduler.retry(created.session()).status());
++        assertEquals(WorldEffectLedger.BeginResult.RUN_ABANDONED,
++                scheduler.beginStep(attempt, 1, new SimulationInterval(1_000, 2_000)));
++        var world = new FakeWorldState();
++        var transfer = candidate(world, new CalculationStep(attempt.runId(), 0, SOLVER_INTERVAL), 0);
++        assertEquals(ExperimentRunScheduler.SubmissionStatus.STALE_ATTEMPT,
++                scheduler.submit(attempt, transfer, precheck(world, transfer),
++                        world.snapshot(), ALL_SERVER_FACTS).status());
++        started(scheduler, req);
++        assertEquals(0, scheduler.claimedTransferCount());
++    }
++
++    @Test
++    void cancelledUnusedSessionWithoutStepsAlsoReleasesLease() {
++        var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
++        var req = single(LASER, 0, 10);
++        var created = started(scheduler, req);
++        assertEquals(ExperimentRunScheduler.CancelStatus.CANCELLED,
++                scheduler.cancelUnclaimedSession(created.session()));
++        started(scheduler, req);
++    }
++
++    @Test
++    void abandoningAttemptForRetryRetainsLease() {
++        var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
++        var req = single(LASER, 0, 10);
++        var created = started(scheduler, req);
++        assertEquals(ExperimentRunScheduler.AbandonStatus.ABANDONED,
++                scheduler.abandon(created.attempt()));
++        assertEquals(ExperimentRunScheduler.CreateStatus.APPARATUS_WINDOW_CONFLICT,
++                scheduler.createExperiment(req).status());
++        assertEquals(ExperimentRunScheduler.RetryStatus.STARTED,
++                scheduler.retry(created.session()).status());
++    }
++
++    @Test
++    void anyClaimEvenFailedRetainsOriginalWindowTombstone() {
++        var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
++        var req = single(LASER, 0, 10);
++        var created = started(scheduler, req);
++        var attempt = created.attempt();
++        var world = new FakeWorldState();
++        assertEquals(WorldEffectLedger.BeginResult.STARTED,
++                scheduler.beginStep(attempt, 0, SOLVER_INTERVAL));
++        var event = candidate(world, new CalculationStep(attempt.runId(), 0, SOLVER_INTERVAL), 0);
++        assertTrue(scheduler.submit(attempt, event, precheck(world, event),
++                world.snapshot(), ALL_SERVER_FACTS).claimed());
++        assertTrue(scheduler.markFailed(attempt, event.eventKey(), "synthetic failure"));
++        assertEquals(ExperimentRunScheduler.CancelStatus.SETTLEMENT_HISTORY_PRESENT,
++                scheduler.cancelUnclaimedSession(created.session()));
++        assertEquals(ExperimentRunScheduler.CreateStatus.APPARATUS_WINDOW_CONFLICT,
++                scheduler.createExperiment(req).status());
++        // Different non-overlapping time slots are not frozen by an older claim.
++        started(scheduler, single(LASER, 10, 20));
++    }
++
++    @Test
++    void anAttemptCannotSubmitForDeviceOutsideReservedSet() {
++        var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
++        var created = started(scheduler, single(MIRROR, 0, 10));
++        var attempt = created.attempt();
++        var world = new FakeWorldState();
++        assertEquals(WorldEffectLedger.BeginResult.STARTED,
++                scheduler.beginStep(attempt, 0, SOLVER_INTERVAL));
++        var event = candidate(world, new CalculationStep(attempt.runId(), 0, SOLVER_INTERVAL), 0);
++        assertEquals(ExperimentRunScheduler.SubmissionStatus.FOREIGN_APPARATUS,
++                scheduler.submit(attempt, event, precheck(world, event),
++                        world.snapshot(), ALL_SERVER_FACTS).status());
++        assertEquals(0, scheduler.claimedTransferCount());
++        assertEquals(ExperimentRunScheduler.CancelStatus.CANCELLED,
++                scheduler.cancelUnclaimedSession(created.session()));
++    }
++
++    @Test
++    void submitMustOccurWithinTrustedScheduledTickWindow() {
++        var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
++        var created = started(scheduler, single(LASER, 10, 20));
++        var attempt = created.attempt();
++        var world = new FakeWorldState();
++        assertEquals(WorldEffectLedger.BeginResult.STARTED,
++                scheduler.beginStep(attempt, 0, SOLVER_INTERVAL));
++        var event = candidate(world, new CalculationStep(attempt.runId(), 0, SOLVER_INTERVAL), 0);
++        var ready = precheck(world, event);
++        for (long outOfWindow : List.of(9L, 20L, 21L)) {
++            var facts = new ServerMutationFacts(true, true, true, true, true, true, outOfWindow);
++            assertEquals(ExperimentRunScheduler.SubmissionStatus.OUTSIDE_RESERVED_SERVER_WINDOW,
++                    scheduler.submit(attempt, event, ready, world.snapshot(), facts).status());
++            assertEquals(0, scheduler.claimedTransferCount());
++        }
++        var inside = new ServerMutationFacts(true, true, true, true, true, true, 19);
++        assertTrue(scheduler.submit(attempt, event, ready, world.snapshot(), inside).claimed());
++        assertEquals(1, scheduler.claimedTransferCount());
++    }
++
++    @Test
++    void serverClockAndSolverNanosecondsAreNeverComparedDirectly() {
++        var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
++        var created = started(scheduler, single(LASER, 10, 20));
++        var attempt = created.attempt();
++        var simulatedNanos = new SimulationInterval(10_000_000, 100_000_000);
++        var world = new FakeWorldState();
++        assertEquals(WorldEffectLedger.BeginResult.STARTED,
++                scheduler.beginStep(attempt, 0, simulatedNanos));
++        var event = candidate(world, new CalculationStep(attempt.runId(), 0, simulatedNanos), 0);
++        var facts = new ServerMutationFacts(true, true, true, true, true, true, 10);
++        assertTrue(scheduler.submit(attempt, event, precheck(world, event),
++                world.snapshot(), facts).claimed());
++    }
++
++    @Test
++    void requestsAndClockIntervalsAreValidatedAndDefensivelyCopied() {
++        assertThrows(IllegalArgumentException.class,
++                () -> new ServerTickWindow(9, 9));
++        assertThrows(IllegalArgumentException.class,
++                () -> new ServerTickWindow(-1, 1));
++        assertThrows(IllegalArgumentException.class,
++                () -> new ServerMutationFacts(true, true, true, true, true, true, -1));
++        assertThrows(IllegalArgumentException.class,
++                () -> new ExperimentReservation(Set.of(), new ServerTickWindow(0, 1)));
++        assertThrows(IllegalArgumentException.class,
++                () -> new ExperimentReservation(null, new ServerTickWindow(0, 1)));
++        assertThrows(IllegalArgumentException.class,
++                () -> new ExperimentReservation(Set.of(LASER), null));
++        var input = new HashSet<>(List.of(LASER));
++        var req = new ExperimentReservation(input, new ServerTickWindow(0, 1));
++        input.clear();
++        assertEquals(1, req.apparatus().size());
++        assertTrue(req.apparatus().contains(LASER));
++        assertThrows(UnsupportedOperationException.class, () -> req.apparatus().clear());
++    }
++
++    @Test
++    void nullRequestFailsClosedWithoutCreatingSession() {
++        var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
++        assertEquals(ExperimentRunScheduler.CreateStatus.INVALID_RESERVATION,
++                scheduler.createExperiment(null).status());
++        assertTrue(scheduler.createExperiment(null).started() == null);
++    }
++
++    @Test
++    void distinctSchedulerInstancesAreStillNotGloballyCoordinated() {
++        var first = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
++        var second = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
++        var req = single(LASER, 0, 10);
++        started(first, req);
++        started(second, req);
++        // DOCUMENTED BOUNDARY: only one authoritative scheduler instance per
++        // server allocation domain, and still no restart-safe allocation.
++    }
++
++    @Test
++    void indexedReservationMatchesDeterministicNaiveOverlapOracle() {
++        var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
++        var keys = List.of(LASER, MIRROR, REMOTE);
++        var accepted = new ArrayList<ExperimentReservation>();
++        var random = new Random(20261026);
++        for (int i = 0; i < 2_000; i++) {
++            var key = keys.get(random.nextInt(keys.size()));
++            long start = random.nextInt(15_000);
++            var request = single(key, start, start + 1 + random.nextInt(15));
++            boolean conflict = accepted.stream().anyMatch(prior ->
++                    prior.apparatus().contains(key) && prior.window().overlaps(request.window()));
++            var result = scheduler.createExperiment(request);
++            assertEquals(conflict ? ExperimentRunScheduler.CreateStatus.APPARATUS_WINDOW_CONFLICT
++                            : ExperimentRunScheduler.CreateStatus.CREATED,
++                    result.status(), "reservation oracle case " + i);
++            if (!conflict) accepted.add(request);
++        }
++    }
++
++    @Test
++    void racingCancelAndSubmitCannotFreeAnActuallyClaimedWindow() throws Exception {
++        for (int repetition = 0; repetition < 30; repetition++) {
++            var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
++            var req = single(LASER, 0, 10);
++            var created = started(scheduler, req);
++            var attempt = created.attempt();
++            var world = new FakeWorldState();
++            assertEquals(WorldEffectLedger.BeginResult.STARTED,
++                    scheduler.beginStep(attempt, 0, SOLVER_INTERVAL));
++            var event = candidate(world,
++                    new CalculationStep(attempt.runId(), 0, SOLVER_INTERVAL), 0);
++            var check = precheck(world, event);
++            var pool = Executors.newFixedThreadPool(2);
++            var ready = new CountDownLatch(2);
++            var go = new CountDownLatch(1);
++            try {
++                var submitFuture = pool.submit(() -> {
++                    ready.countDown();
++                    if (!go.await(5, TimeUnit.SECONDS)) throw new AssertionError("start timeout");
++                    return scheduler.submit(attempt, event, check, world.snapshot(),
++                            ALL_SERVER_FACTS).status();
++                });
++                var cancelFuture = pool.submit(() -> {
++                    ready.countDown();
++                    if (!go.await(5, TimeUnit.SECONDS)) throw new AssertionError("start timeout");
++                    return scheduler.cancelUnclaimedSession(created.session());
++                });
++                assertTrue(ready.await(5, TimeUnit.SECONDS));
++                go.countDown();
++                var submit = submitFuture.get(5, TimeUnit.SECONDS);
++                var cancel = cancelFuture.get(5, TimeUnit.SECONDS);
++                if (submit == ExperimentRunScheduler.SubmissionStatus.CLAIMED) {
++                    assertEquals(ExperimentRunScheduler.CancelStatus.SETTLEMENT_HISTORY_PRESENT, cancel);
++                    assertEquals(ExperimentRunScheduler.CreateStatus.APPARATUS_WINDOW_CONFLICT,
++                            scheduler.createExperiment(req).status());
++                    assertEquals(1, scheduler.claimedTransferCount());
++                } else {
++                    assertEquals(ExperimentRunScheduler.SubmissionStatus.STALE_ATTEMPT, submit);
++                    assertEquals(ExperimentRunScheduler.CancelStatus.CANCELLED, cancel);
++                    assertEquals(0, scheduler.claimedTransferCount());
++                    started(scheduler, req);
++                }
++            } finally {
++                go.countDown();
++                pool.shutdownNow();
++                assertTrue(pool.awaitTermination(5, TimeUnit.SECONDS));
++            }
++        }
++    }
++
++    @Test
++    void concurrentConflictingAllocationsHaveExactlyOneWinner() throws Exception {
++        for (int round = 0; round < 24; round++) {
++            var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
++            var req = single(LASER, 0, 10);
++            var pool = Executors.newFixedThreadPool(2);
++            var ready = new CountDownLatch(2);
++            var go = new CountDownLatch(1);
++            try {
++                var a = pool.submit(() -> {
++                    ready.countDown();
++                    if (!go.await(5, TimeUnit.SECONDS)) throw new AssertionError("start timeout");
++                    return scheduler.createExperiment(req).status();
++                });
++                var b = pool.submit(() -> {
++                    ready.countDown();
++                    if (!go.await(5, TimeUnit.SECONDS)) throw new AssertionError("start timeout");
++                    return scheduler.createExperiment(req).status();
++                });
++                assertTrue(ready.await(5, TimeUnit.SECONDS));
++                go.countDown();
++                var winnerA = a.get(5, TimeUnit.SECONDS);
++                var winnerB = b.get(5, TimeUnit.SECONDS);
++                assertTrue((winnerA == ExperimentRunScheduler.CreateStatus.CREATED
++                        && winnerB == ExperimentRunScheduler.CreateStatus.APPARATUS_WINDOW_CONFLICT)
++                        || (winnerB == ExperimentRunScheduler.CreateStatus.CREATED
++                        && winnerA == ExperimentRunScheduler.CreateStatus.APPARATUS_WINDOW_CONFLICT));
++            } finally {
++                go.countDown();
++                pool.shutdownNow();
++                assertTrue(pool.awaitTermination(5, TimeUnit.SECONDS));
++            }
++        }
++    }
++}
+--- a/experiment-core/src/test/java/dev/coldatomcraft/experiment/world/ExperimentRunSchedulerTest.java
++++ b/experiment-core/src/test/java/dev/coldatomcraft/experiment/world/ExperimentRunSchedulerTest.java
+@@ -15,12 +15,27 @@
+ /** Pure Java attempt fencing. Does NOT stand in for the missing server adapter. */
+ class ExperimentRunSchedulerTest {
+     private static final SimulationInterval INTERVAL = new SimulationInterval(0, 1_000);
++    private static final ApparatusKey APPARATUS = new ApparatusKey(
++            FakeWorldState.DIMENSION, FakeWorldState.DEVICE_X,
++            FakeWorldState.DEVICE_Y, FakeWorldState.DEVICE_Z);
++
++    private static ExperimentRunScheduler.StartedSession create(ExperimentRunScheduler scheduler) {
++        return create(scheduler, 0, 10);
++    }
++
++    private static ExperimentRunScheduler.StartedSession create(ExperimentRunScheduler scheduler,
++                                                               long firstTick, long lastTick) {
++        var outcome = scheduler.createExperiment(ExperimentReservation.single(APPARATUS,
++                new ServerTickWindow(firstTick, lastTick)));
++        assertEquals(ExperimentRunScheduler.CreateStatus.CREATED, outcome.status());
++        return outcome.started();
++    }
+ 
+     @Test
+     void sessionAndRunIdsAreIssuedAndDistinct() {
+         var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
+-        var a = scheduler.createExperiment();
+-        var b = scheduler.createExperiment();
++        var a = create(scheduler);
++        var b = create(scheduler, 10, 20);
+         assertNotEquals(a.session().sessionId(), b.session().sessionId());
+         assertNotEquals(a.attempt().runId(), b.attempt().runId());
+         assertEquals(0L, a.attempt().ordinal());
+@@ -32,7 +47,7 @@
+     @Test
+     void staleWorldRejectionThenAbandonThenFreshRunMayClaim() {
+         var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
+-        var session = scheduler.createExperiment();
++        var session = create(scheduler);
+         var world = new FakeWorldState();
+         var first = session.attempt();
+         assertEquals(WorldEffectLedger.BeginResult.STARTED, scheduler.beginStep(first, 0, INTERVAL));
+@@ -68,7 +83,7 @@
+     @Test
+     void unstartedAttemptCanBeAbandonedWithoutAllocatingLedgerSteps() {
+         var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
+-        var created = scheduler.createExperiment();
++        var created = create(scheduler);
+         assertEquals(ExperimentRunScheduler.AbandonStatus.ABANDONED,
+                 scheduler.abandon(created.attempt()));
+         assertEquals(ExperimentRunScheduler.AbandonStatus.ALREADY_ABANDONED,
+@@ -80,7 +95,7 @@
+     @Test
+     void afterClaimCannotAbandonOrRetryEvenIfMarkedFailed() {
+         var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
+-        var created = scheduler.createExperiment();
++        var created = create(scheduler);
+         var world = new FakeWorldState();
+         assertEquals(WorldEffectLedger.BeginResult.STARTED,
+                 scheduler.beginStep(created.attempt(), 0, INTERVAL));
+@@ -100,7 +115,7 @@
+     void foreignAttemptFromAnotherSchedulerCannotAccessThisLedger() {
+         var a = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
+         var b = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
+-        var attempt = a.createExperiment().attempt();
++        var attempt = create(a).attempt();
+         assertEquals(WorldEffectLedger.BeginResult.INVALID, b.beginStep(attempt, 0, INTERVAL));
+         assertEquals(ExperimentRunScheduler.AbandonStatus.INVALID_ATTEMPT, b.abandon(attempt));
+         assertEquals(ExperimentRunScheduler.SubmissionStatus.INVALID_ATTEMPT,
+@@ -110,7 +125,7 @@
+     @Test
+     void mismatchedRunIdCannotSubmitToCurrentAttempt() {
+         var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
+-        var created = scheduler.createExperiment();
++        var created = create(scheduler);
+         var world = new FakeWorldState();
+         assertEquals(WorldEffectLedger.BeginResult.STARTED,
+                 scheduler.beginStep(created.attempt(), 0, INTERVAL));
+@@ -124,11 +139,11 @@
+     @Test
+     void wrongModelOrRevokedPermissionDoNotConsumeAttempt() {
+         var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
+-        var created = scheduler.createExperiment();
++        var created = create(scheduler);
+         var world = new FakeWorldState();
+         scheduler.beginStep(created.attempt(), 0, INTERVAL);
+         var transfer = candidate(world, new CalculationStep(created.attempt().runId(),0,INTERVAL),0);
+-        var revoked = new ServerMutationFacts(true, true, true, true, true, false);
++        var revoked = new ServerMutationFacts(true, true, true, true, true, false, 0);
+         var result = scheduler.submit(created.attempt(), transfer, precheck(world, transfer),
+                 world.snapshot(), revoked);
+         assertEquals(ExperimentRunScheduler.SubmissionStatus.REJECTED_BY_COORDINATOR,result.status());
+@@ -137,32 +152,27 @@
+     }
+ 
+     @Test
+-    void separateSessionsAreNotADeviceTimeExclusivityGuarantee() {
+-        // DOCUMENTED GAP: no authoritative apparatus / physical-operation identity
+-        // is associated with these sessions. Both different run IDs can reserve
+-        // the same simulated interval for the same world device/target.
+-        // A real server scheduler MUST disallow this where effects can overlap.
+-        var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
+-        var first = scheduler.createExperiment().attempt();
+-        var second = scheduler.createExperiment().attempt();
++    void overlappingSessionCannotReserveSameApparatusWindow() {
++        var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
++        var first = create(scheduler).attempt();
++        var rejected = scheduler.createExperiment(ExperimentReservation.single(APPARATUS,
++                new ServerTickWindow(9, 15)));
++        assertEquals(ExperimentRunScheduler.CreateStatus.APPARATUS_WINDOW_CONFLICT,
++                rejected.status());
++        assertTrue(rejected.started() == null);
+         var world = new FakeWorldState();
+         assertEquals(WorldEffectLedger.BeginResult.STARTED,
+                 scheduler.beginStep(first, 0, INTERVAL));
+-        assertEquals(WorldEffectLedger.BeginResult.STARTED,
+-                scheduler.beginStep(second, 0, INTERVAL));
+         var a = candidate(world, new CalculationStep(first.runId(), 0, INTERVAL), 0);
+-        var b = candidate(world, new CalculationStep(second.runId(), 0, INTERVAL), 0);
+         assertTrue(scheduler.submit(first, a, precheck(world,a), world.snapshot(), ALL_SERVER_FACTS).claimed());
+-        assertTrue(scheduler.submit(second, b, precheck(world,b), world.snapshot(), ALL_SERVER_FACTS).claimed());
+-        assertEquals(2, scheduler.claimedTransferCount(),
+-                "current scheduler does not deduplicate independently created physical sessions");
++        assertEquals(1, scheduler.claimedTransferCount());
+     }
+ 
+     @Test
+     void claimAndAbandonRaceCannotBothWin() throws Exception {
+         for (int repetition = 0; repetition < 60; repetition++) {
+             var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
+-            var created = scheduler.createExperiment();
++            var created = create(scheduler);
+             var world = new FakeWorldState();
+             scheduler.beginStep(created.attempt(), 0, INTERVAL);
+             var transfer = candidate(world, new CalculationStep(created.attempt().runId(),0,INTERVAL),0);
+--- a/experiment-core/src/test/java/dev/coldatomcraft/experiment/world/ServerEffectCommitCoordinatorTest.java
++++ b/experiment-core/src/test/java/dev/coldatomcraft/experiment/world/ServerEffectCommitCoordinatorTest.java
+@@ -116,7 +116,7 @@
+     @Test
+     void revokedPermissionRejectsSubmission() {
+         Fixture f = fixture(null);
+-        var facts = new ServerMutationFacts(true, true, true, true, true, false);
++        var facts = new ServerMutationFacts(true, true, true, true, true, false, 0);
+         assertEquals(ServerEffectCommitCoordinator.Decision.SERVER_REVALIDATION_FAILED,
+                 f.coordinator().submit(f.candidate(), f.precheck(), f.world().snapshot(), facts));
+     }
+@@ -124,7 +124,7 @@
+     @Test
+     void nonServerThreadRejectsSubmission() {
+         Fixture f = fixture(null);
+-        var facts = new ServerMutationFacts(false, true, true, true, true, true);
++        var facts = new ServerMutationFacts(false, true, true, true, true, true, 0);
+         assertEquals(ServerEffectCommitCoordinator.Decision.SERVER_REVALIDATION_FAILED,
+                 f.coordinator().submit(f.candidate(), f.precheck(), f.world().snapshot(), facts));
+     }
+--- a/experiment-core/src/test/java/dev/coldatomcraft/experiment/world/ServerEffectGateTest.java
++++ b/experiment-core/src/test/java/dev/coldatomcraft/experiment/world/ServerEffectGateTest.java
+@@ -57,17 +57,17 @@
+         assertTrue(fixture.precheck().allowed());
+         assertTrue(authorize(fixture, ALL_SERVER_FACTS).allowed());
+ 
+-        assertRejected(fixture, new ServerMutationFacts(false, true, true, true, true, true),
++        assertRejected(fixture, new ServerMutationFacts(false, true, true, true, true, true, 0),
+                 ServerEffectGate.RejectionReason.NOT_SERVER_THREAD);
+-        assertRejected(fixture, new ServerMutationFacts(true, false, true, true, true, true),
++        assertRejected(fixture, new ServerMutationFacts(true, false, true, true, true, true, 0),
+                 ServerEffectGate.RejectionReason.SOURCE_DEVICE_UNRESOLVED);
+-        assertRejected(fixture, new ServerMutationFacts(true, true, false, true, true, true),
++        assertRejected(fixture, new ServerMutationFacts(true, true, false, true, true, true, 0),
+                 ServerEffectGate.RejectionReason.TARGET_IDENTITY_UNRESOLVED);
+-        assertRejected(fixture, new ServerMutationFacts(true, true, true, false, true, true),
++        assertRejected(fixture, new ServerMutationFacts(true, true, true, false, true, true, 0),
+                 ServerEffectGate.RejectionReason.TARGET_POSITION_STALE);
+-        assertRejected(fixture, new ServerMutationFacts(true, true, true, true, false, true),
++        assertRejected(fixture, new ServerMutationFacts(true, true, true, true, false, true, 0),
+                 ServerEffectGate.RejectionReason.TARGET_CHUNK_UNLOADED);
+-        assertRejected(fixture, new ServerMutationFacts(true, true, true, true, true, false),
++        assertRejected(fixture, new ServerMutationFacts(true, true, true, true, true, false, 0),
+                 ServerEffectGate.RejectionReason.PERMISSION_DENIED);
+     }
+ 
+--- a/verification/Smoke.java
++++ b/verification/Smoke.java
+@@ -15,6 +15,9 @@
+ import dev.coldatomcraft.experiment.world.DeviceSnapshot;
+ import dev.coldatomcraft.experiment.world.EnergyTransferCandidate;
+ import dev.coldatomcraft.experiment.world.ExperimentRunScheduler;
++import dev.coldatomcraft.experiment.world.ExperimentReservation;
++import dev.coldatomcraft.experiment.world.ApparatusKey;
++import dev.coldatomcraft.experiment.world.ServerTickWindow;
+ import dev.coldatomcraft.experiment.world.ServerEffectCommitCoordinator;
+ import dev.coldatomcraft.experiment.world.ServerEffectGate;
+ import dev.coldatomcraft.experiment.world.ServerMutationFacts;
+@@ -185,11 +188,11 @@
+                 "empty interval rejected");
+ 
+         var currentWorld = new ServerWorldSnapshot(readSet, device, target);
+-        var allFacts = new ServerMutationFacts(true, true, true, true, true, true);
++        var allFacts = new ServerMutationFacts(true, true, true, true, true, true, 10);
+         var authorization = ServerEffectGate.authorize(effect, precheck, verified, currentWorld, allFacts);
+         check(authorization.allowed(), "fresh server snapshot and facts revalidate");
+         check(!ServerEffectGate.authorize(effect, precheck, verified, currentWorld,
+-                new ServerMutationFacts(true, true, true, true, true, false)).allowed(),
++                new ServerMutationFacts(true, true, true, true, true, false, 0)).allowed(),
+                 "missing permission fails closed");
+         var staleWorld = new ServerWorldSnapshot(changedReadSet, device, target);
+         check(!ServerEffectGate.authorize(effect, precheck, verified, staleWorld, allFacts).allowed(),
+@@ -304,7 +307,15 @@
+         // fences late arrivals; replay can only run under the same session's
+         // replacement attempt. This does not substitute for world authority.
+         var scheduler = new ExperimentRunScheduler(catalog);
+-        var session = scheduler.createExperiment();
++        var reservation = ExperimentReservation.single(ApparatusKey.of(device),
++                new ServerTickWindow(10, 20));
++        var allocated = scheduler.createExperiment(reservation);
++        check(allocated.status() == ExperimentRunScheduler.CreateStatus.CREATED,
++                "server operation reserve created");
++        var session = allocated.started();
++        check(scheduler.createExperiment(reservation).status()
++                == ExperimentRunScheduler.CreateStatus.APPARATUS_WINDOW_CONFLICT,
++                "two sessions cannot reserve same apparatus/time");
+         var initialAttempt = session.attempt();
+         check(initialAttempt.runId().startsWith("cac-run-"), "run token minted by scheduler");
+         check(scheduler.beginStep(initialAttempt, 0, new SimulationInterval(0, 500))
+@@ -340,6 +351,12 @@
+                 == ExperimentRunScheduler.AbandonStatus.CLAIMS_PREVENT_ABANDONMENT,
+                 "claimed run cannot be replaced");
+         check(scheduler.claimedTransferCount() == 1, "replacement claimed count is one");
++        check(scheduler.cancelUnclaimedSession(session.session())
++                == ExperimentRunScheduler.CancelStatus.SETTLEMENT_HISTORY_PRESENT,
++                "claimed session holds its apparatus/time reservation");
++        check(scheduler.createExperiment(reservation).status()
++                == ExperimentRunScheduler.CreateStatus.APPARATUS_WINDOW_CONFLICT,
++                "claimed reservation remains a tombstone");
+         var secondScheduler = new ExperimentRunScheduler(catalog);
+         check(secondScheduler.beginStep(next.attempt(), 1, new SimulationInterval(500, 1000))
+                 == WorldEffectLedger.BeginResult.INVALID,

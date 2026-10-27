@@ -1,0 +1,952 @@
+--- a/README.md
++++ b/README.md
+@@ -1,4 +1,14 @@
+ # Cold Atom Craft (CAC)
++
++**Status: M0-R2.1-D2 code director checkpoint, 2026-10-26 — NOT a release; M0 remains open.**
++
++D2 adds provenance-independent event-slot deduplication and an in-memory scheduler-issued logical experiment attempt manager (intended for future server integration). **No playable laser, Owner-approved physical formula, real world damage, or production NeoForge mutation adapter has been added.** See [D2 audit](docs/M0_R2_1_D2_AUDIT.md) and [D2 evidence](verification/M0-R2.1-D2/README.md).
++
++**D2 verification:** Java 21 standalone engineering checks 379/379 PASS; ad-hoc assertion reflection sweep 131/131 PASS (**NOT JUnit**); Python asset tests 17/17 PASS. Formal Java 25 Gradle/JUnit and the D2 NeoForge build/runtime are **NOT RUN**; historical M0-R2 runtime evidence does not verify D2.
++
++---
++
++## Archived D1 README (historical snapshot; NOT D2 verification)
+ 
+ **Status:** M0-R2.1-D1 director engineering checkpoint (2026-10-26). **M0 remains open; no playable laser or owner-approved physical models are included.**
+ 
+--- a/docs/ARCHITECTURE.md
++++ b/docs/ARCHITECTURE.md
+@@ -1,3 +1,12 @@
++# CAC M0-R2.1-D2 architectural delta
++
++- `WorldEffectLedger.claim` now checks a secondary `(runId,stepIndex,eventIndex)` uniqueness index, independent of model provenance. Full `TransferEventKey` remains for outcome lookup and audit.
++- `ExperimentRunScheduler` encapsulates a private Ledger and CommitCoordinator, issues server-local logical `Session` and attempt tokens, and fences aborted unclaimed attempts. Claim / abandon operations are serialized; claims block restart in the same session.
++- **Deliberately unsolved:** independent Sessions are not checked for shared apparatus / physical operation / time. The NeoForge adapter and authoritative scheduler must solve this before world mutation, along with crash-safe delivery semantics.
++- **D2 is pure Java only.** No new NeoForge API, rendering, physical formulas, or owner-owned Blender assets.
++
++---
++
+ # Architecture boundary — M0-R2.1-D1 (M0 still open)
+ 
+ **Status:** engineering proposal implemented only where explicitly indicated.
+--- a/docs/CHANGELOG.md
++++ b/docs/CHANGELOG.md
+@@ -1,4 +1,12 @@
+ # Changelog
++
++## M0-R2.1-D2 · 2026-10-26 · Director checkpoint (NOT a release)
++
++- Fixed a demonstrated duplicate claim when `(runId,stepIndex,eventIndex)` remained constant but model ID/revision differed; added independent event-slot index and audit lookup.
++- Added `ExperimentRunScheduler`: scheduler-issued logical sessions and attempt tokens for future trusted server use, stale attempt fencing, replacement only after zero-claim abandonment, same-session no-replay after Claim.
++- Added formal JUnit source tests for slot aliases and scheduler concurrency; independent JDK21 reflection shim executed 131/131 methods (not JUnit), standalone smoke 379/379 and Python asset suite 17/17.
++- Captured a before-fix RED probe and noisy same-host D1/D2 microbenchmarks; retained all historic D1 evidence without claiming it as D2.
++- No scientific equations, game-world effects, server world adapter or Blender model created; full Java25/Gradle/NeoForge D2 build NOT RUN.
+ 
+ ## M0-R2.1-D1 · 2026-10-26 · Director checkpoint (not a release)
+ 
+--- a/docs/DECISIONS.md
++++ b/docs/DECISIONS.md
+@@ -1,3 +1,15 @@
++# Director decision record: CAC-M0-R2.1-D2 (2026-10-26)
++
++**D2-01:** Require uniqueness of each `(runId,stepIndex,eventIndex)` event slot independent of model ID/revision, preserving model provenance in the original TransferEventKey. Motivated by an actual D1 two-claim reproduction.
++
++**D2-02:** For a single logical experiment in memory, use a private-ledger `ExperimentRunScheduler` to issue attempt tokens and serialize claim/abandon/retry. Replace stale unclaimed attempts only; never replay an experiment session after a Claim.
++
++**D2-03 (explicit limitation):** Two different experiment sessions can still refer to the same physical apparatus/time. Do not allow destructive effects until a true server-side physical-operation scheduler and world-state adapter enforce exclusion.
++
++**D2-04:** No durable exactly-once claim, no automatic safe eviction, no Owner science model or Blender handoff implied. Java25/NeoForge D2 build and release Gate remain open.
++
++---
++
+ # Decision log
+ 
+ ## CAC-001 - 2026-10-25 - Project authorization
+--- a/docs/M0_R2_1_D2_AUDIT.md
++++ b/docs/M0_R2_1_D2_AUDIT.md
+@@ -0,0 +1,62 @@
++# CAC M0-R2.1-D2 — code director audit
++
++**Date:** 2026-10-26  
++**Parent:** frozen `ColdAtomCraft-M0-R2.1-D1-DirectorCheckpoint.zip` (input integrity validated before copy).  
++**Scope:** pure-Java event deduplication and one-logical-experiment run-attempt fencing; no Minecraft mutation or science model.
++
++## Finding F-D2-01: model-revision event-slot bypass
++
++Independently reproduced on the D1 main sources compiled with JDK 21. In a single run and step, events `(THM-001,A,run-one,0,0)` and `(THM-001,B,run-one,0,0)` both returned `CLAIMED`; the ledger count was 2. This violates the existing requirement that `eventIndex` identify **one event within a step**, regardless of which scientific model is used to produce it. The fixture's approved models are synthetic tests, NOT scientific Owner authorizations.
++
++**Fix:** `WorldEffectLedger` now reserves `(calculationRunId,stepIndex,eventIndex)` in a second map on the same synchronized Claim transition, while retaining full `TransferEventKey` provenance for outcome reporting. Changing model ID, model revision, target, or energy cannot create a second claim for the same slot. `claimedEventForSlot` exposes the provenance of the first claim for diagnostics; `stateOf` remains a lookup for an exact transfer key.
++
++**Result:** D2 reproduction: `A: CLAIMED`, `B: DUPLICATE_TRANSFER`, claim count 1. New formal JUnit source `LedgerEventSlotTest` covers model changes, terminal states, other legal slots, and a two-thread race.
++
++## Finding F-D2-02: logical experiment replays across arbitrarily created run IDs
++
++D1 can abandon an unclaimed run, but anyone holding its ledger could then create another run ID—even while the first run has claims—because the ledger cannot associate multiple run IDs with one logical experiment.
++
++**Minimal contract improvement:** `ExperimentRunScheduler` owns a private ledger and pure-Java commit coordinator; it issues non-client-supplied `Session` and `Attempt` handles. `beginStep`, `submit`, `abandon`, `retry`, and outcome methods are serialized by the scheduler. A stale unclaimed attempt may be abandoned and replaced; old attempts are fenced. After ANY successful claim, abandonment and replacement in the **same session** are refused, including when that claim is later FAILED.
++
++**Critical limitation:** this is **not** a physical apparatus/time scheduler. An independent new `Session` can still represent the same physical operation and claim another event. This residual gap is explicitly tested. Production code must not bypass the scheduler to use a bare `WorldEffectLedger` or `ServerEffectCommitCoordinator` directly, and a future NeoForge server allocator must enforce an authoritative apparatus/operation/time identity across sessions. Client-provided handles are not an authorization mechanism.
++
++## Test and build evidence
++
++| Validation | Result | Evidence |
++| --- | --- | --- |
++| D1 artifact manifest | PASS | archive `MANIFEST_SHA256.txt` checked on extraction |
++| D1 slot bypass reproduction | **RED reproduced** | `verification/M0-R2.1-D2/logs/slot-defect-red.txt` |
++| D2 slot bypass fix | **PASS** | synthetic Java slot probe and `LedgerEventSlotTest.java` |
++| Java 21 main source compile | **PASS** | `javac --release 21` for physics-core and experiment-core |
++| Standalone Java checks | **379/379 PASS** | `logs/java21-standalone-smoke.txt` |
++| Offline reflection assertion run | **131/131 PASS, NOT JUNIT** | `logs/java21-non-junit-reflection-sweep.txt`; source in `offline-harness/` |
++| Python assets | **17/17 PASS** | `logs/python-asset-tests.txt` |
++| D1 vs D2 synthetic microbenchmark | **OBSERVATIONAL** | `performance/*.log`, five trials per workload |
++| Official JDK 25 / Gradle/JUnit on D2 | **NOT RUN** | JDK 25 and remote repositories unavailable here |
++| D2 NeoForge packaged JAR / installed runtime | **NOT RUN** | no D2 JAR generated |
++| Real NeoForge mutation adapter / device scheduler | **NOT IMPLEMENTED** | no server-authoritative world-capture or device/time lock |
++| Model equations and Blender assets | **NOT IMPLEMENTED** | remain Owner-controlled |
++
++## Benchmark interpretation
++
++Same-host JDK 21 microbenchmark, 5 samples per size after warm-up (timings in ms):
++
++| Operation | D1 median | D2 median |
++| --- | ---: | ---: |
++| Register 1,000 steps | 1.735 | 1.532 |
++| Register 10,000 steps | 6.752 | 6.614 |
++| Register 50,000 steps | 30.394 | 27.841 |
++| 20,000 claims + outcomes | 10.272 | 4.783 |
++
++The claim workload has **large long-tail variation** (see raw trial logs), likely influenced by JIT/GC and host load. These samples do **not** establish that D2 is faster, nor do they measure Minecraft TPS, physics solver cost, memory leaks, or production world effects. The EventSlot index does add expected O(number of claims) memory. No history eviction has been introduced.
++
++## Unresolved security / correctness gates
++
++1. **P0 before real world mutation:** create a trusted NeoForge `ServerLevel` snapshot/permission/submit adapter, revalidating the entire read set and target on the server thread, with no uncontrolled async gap before mutation.
++2. **P0 before real world mutation:** enforce device/physical-operation/time exclusivity **between different sessions**, not just attempts of one session.
++3. **P0 for destructive effect delivery after crashes:** design and Owner-approve a gameplay delivery guarantee (such as explicit at-most-once with lost-effect risk) and a persistent recovery protocol if stronger semantics are required. No restart-safe exactly-once guarantee exists.
++4. **P1 before long-running worlds:** bounded history and tombstone lifecycle policy, profiling with server TPS and actual chunk/entity loads.
++5. **M0 source acceptance:** execute formal Java 25 Gradle/JUnit, verify D2 distributable JAR, client/server and isolated installed-JAR load. Historic R2 passing logs do not cover D2.
++6. **Owner gate:** final M0 acceptance remains with Owner; physics and Blender remain separately controlled.
++
++**Director assessment:** D2 is a tested pure-Java development checkpoint; **NOT a production-world-effect release**, and **M0 remains open**. No scientific model changed or fabricated.
+--- a/docs/PERFORMANCE_AUDIT.md
++++ b/docs/PERFORMANCE_AUDIT.md
+@@ -1,3 +1,11 @@
++# D2 performance addendum — JDK 21 synthetic comparison
++
++The D1 vs D2 5-trial benchmark was run on the **same available Linux JDK 21 machine**, not in Minecraft. Median results (ms): register 1,000: 1.735 vs 1.532; register 10,000: 6.752 vs 6.614; register 50,000: 30.394 vs 27.841; 20,000 claim+mark: 10.272 vs 4.783. Some claim trials had long GC/JIT-influenced tails, so the measurements **do not establish a speedup or performance regression**. The extra EventSlot map requires additional memory per claimed event. No TPS or persistent-world performance test was run. Raw logs: `verification/M0-R2.1-D2/performance/`.
++
++`ExperimentRunScheduler` synchronizes short pure-Java metadata checks but cannot be treated as a license to perform Minecraft world mutation or expensive physics while its lock is held. No history cleanup or cross-restart semantics changed.
++
++---
++
+ # WorldEffectLedger performance audit — M0-R2.1-D1
+ 
+ **Scope:** in-memory step-index registration and transfer claim, not a proof of world performance/TPS. 2026-10-26.
+--- a/docs/TEST_PLAN.md
++++ b/docs/TEST_PLAN.md
+@@ -1,3 +1,22 @@
++# CAC M0-R2.1-D2 test status (2026-10-26)
++
++| D2 test | Status | Detail |
++| --- | --- | --- |
++| Historical D1 input integrity | PASS | 156 D1 manifest members verified before D2 editing |
++| Same event slot, changed model revision | **PASS** | D1 RED reproduced, D2 accepted first claim only |
++| Java 21 pure core + smoke | **PASS 379/379** | `verification/M0-R2.1-D2/logs/java21-standalone-smoke.txt` |
++| Full test methods with temporary assertion runner | **PASS 131/131, NOT JUNIT** | temporary source in `verification/M0-R2.1-D2/offline-harness/` |
++| Python assets | **PASS 17/17** | `logs/python-asset-tests.txt` |
++| D1 vs D2 microbenchmark | OBSERVATIONAL | same-host JDK 21; variable times, no TPS claim |
++| Formal Java 25 / Gradle JUnit | **NOT RUN** | cannot resolve JDK 25 / repositories in this environment |
++| NeoForge D2 build, JAR and development client/server | **NOT RUN** | no D2 distributable JAR created |
++| Independent production installed JAR | **NOT RUN** | no D2 JAR or NeoForge installation |
++| Actual Blender / optical / world effect | **NOT IMPLEMENTED** | Owner input and server adapter pending |
++
++See [D2 full audit](M0_R2_1_D2_AUDIT.md). Earlier R2 and D1 reports below are historical, not final-D2 evidence.
++
++---
++
+ # Director D1 addendum — 2026-10-26 (M0-R2.1, not M0 closure)
+ 
+ **Do not treat historical M0-R2 build/JAR/runtime logs as validation of modified D1 source.**
+--- a/docs/WORLD_INTERACTION_CONTRACT.md
++++ b/docs/WORLD_INTERACTION_CONTRACT.md
+@@ -1,3 +1,17 @@
++# M0-R2.1-D2 world-interaction contract addendum
++
++## D2 provenance-independent event uniqueness
++
++Each event slot `(runId, stepIndex, eventIndex)` may be claimed at most once within a `WorldEffectLedger` instance. `TransferEventKey` retains `(modelId, revision, runId, stepIndex, eventIndex)` for audit provenance, but changing a model identifier or revision can no longer evade the physical slot reservation. The map `claimedEventForSlot` allows inspection of which full key first claimed a slot. This does **not** prevent two independently allocated run IDs from representing the same physical operation.
++
++## D2 experiment attempt fencing
++
++`ExperimentRunScheduler` is the new preferred pure-Java orchestration contract. It privately owns the ledger and coordinator, allocates local `Session` and `Attempt` handles (without proving server provenance), and serializes begin/submit/abandon/retry under one monitor. A stale attempt with zero claims may be retired and reissued inside its original session; old callbacks are rejected. Once any event is claimed, that session cannot be abandoned and reissued. This is tested under repeated Claim/Abandon competition.
++
++**Not a production authority:** a new independent session can still duplicate the same apparatus/time operation. The bare `WorldEffectLedger` and `ServerEffectCommitCoordinator` remain public legacy building blocks and can be misused; no live NeoForge mutation code currently calls them. Before enabling real effects, an authoritative server adapter must enforce use of an owned scheduling path, device/time overlap policies, fresh snapshots and permissions, and an accepted crash/recovery contract. Session tokens are JVM-scoped; their UUID strings are not authorization.
++
++---
++
+ # World interaction contract — v0.3 (M0-R2.1-D1)
+ 
+ **Status:** engineering contract implemented in pure Java and tests; **no Minecraft world mutation is implemented**.
+--- a/experiment-core/src/main/java/dev/coldatomcraft/experiment/world/ExperimentRunScheduler.java
++++ b/experiment-core/src/main/java/dev/coldatomcraft/experiment/world/ExperimentRunScheduler.java
+@@ -0,0 +1,260 @@
++package dev.coldatomcraft.experiment.world;
++
++import dev.coldatomcraft.experiment.ModelCatalog;
++
++import java.util.UUID;
++
++/**
++ * In-memory, server-intended *logical experiment* attempt fencing.
++ *
++ * <p>One {@link Session} represents one logical execution, not an apparatus or
++ * an entire research project. Its first {@link Attempt} is issued here, not by
++ * a caller-supplied string. When that attempt becomes stale <em>before any
++ * event is claimed</em>, {@link #abandon(Attempt)} allows exactly one replacement
++ * attempt to become current. Every callback from a retired attempt is rejected.
++ * Once an event has been claimed, replacement is forbidden because even FAILED
++ * or outstanding CLAIMED outcomes may have affected the world.</p>
++ *
++ * <p>All state transitions here and in the owned ledger occur under this
++ * scheduler's monitor. No computation, game-world operation, network call or
++ * user callback is executed by this class. The underlying ledger is private:
++ * production code must not bypass the attempt fence by making direct claims.</p>
++ *
++ * <p><strong>Important limitations:</strong> this is ordinary pure Java code;
++ * construction and IDs do not prove a caller is a Minecraft server. The future
++ * NeoForge adapter must instantiate and invoke it only in a trusted server
++ * context. Creating another session for the
++ * same physical operation is NOT detected. Only the future authoritative game
++ * scheduler can define physical-operation identity, permissions, device/time
++ * ownership, and prevent overlapping independent sessions. The model and world
++ * snapshots passed to {@link #submit} remain caller-provided records; a real
++ * NeoForge adapter must capture them on the server thread immediately before
++ * mutation. No persistent or cross-restart exactly-once guarantee exists.</p>
++ */
++public final class ExperimentRunScheduler {
++    public enum RetryStatus {
++        STARTED,
++        ACTIVE_ATTEMPT,
++        SETTLEMENT_HISTORY_PRESENT,
++        INVALID_SESSION
++    }
++
++    public enum AbandonStatus {
++        ABANDONED,
++        ALREADY_ABANDONED,
++        CLAIMS_PREVENT_ABANDONMENT,
++        INVALID_ATTEMPT
++    }
++
++    public enum SubmissionStatus {
++        CLAIMED,
++        INVALID_ATTEMPT,
++        STALE_ATTEMPT,
++        FOREIGN_RUN,
++        REJECTED_BY_COORDINATOR
++    }
++
++    /** Internal reference: constructor intentionally inaccessible to callers. */
++    public static final class Session {
++        private final ExperimentRunScheduler owner;
++        private final String sessionId;
++        private Attempt current;
++        private boolean claimedAny;
++        private long nextAttemptOrdinal;
++
++        private Session(ExperimentRunScheduler owner, String sessionId) {
++            this.owner = owner;
++            this.sessionId = sessionId;
++        }
++
++        public String sessionId() {
++            return sessionId;
++        }
++    }
++
++    /** Scheduler-issued attempt token; its textual ID is not authorization. */
++    public static final class Attempt {
++        private final Session session;
++        private final String runId;
++        private final long ordinal;
++        private boolean abandoned;
++
++        private Attempt(Session session, String runId, long ordinal) {
++            this.session = session;
++            this.runId = runId;
++            this.ordinal = ordinal;
++        }
++
++        public String runId() {
++            return runId;
++        }
++
++        public long ordinal() {
++            return ordinal;
++        }
++
++        public String sessionId() {
++            return session.sessionId;
++        }
++    }
++
++    public record StartedSession(Session session, Attempt attempt) { }
++
++    public record RetryOutcome(RetryStatus status, Attempt attempt) {
++        public RetryOutcome {
++            if ((status == RetryStatus.STARTED) != (attempt != null)) {
++                throw new IllegalArgumentException("only STARTED can carry a new attempt");
++            }
++        }
++    }
++
++    /** A claimed result is only a reservation, never an assertion of mutation. */
++    public record Submission(SubmissionStatus status,
++                             ServerEffectCommitCoordinator.Decision coordinatorDecision) {
++        public boolean claimed() {
++            return status == SubmissionStatus.CLAIMED;
++        }
++    }
++
++    private final WorldEffectLedger ledger = new WorldEffectLedger();
++    private final ServerEffectCommitCoordinator coordinator;
++
++    public ExperimentRunScheduler(ModelCatalog trustedCatalog) {
++        if (trustedCatalog == null) {
++            throw new IllegalArgumentException("trusted catalog required");
++        }
++        coordinator = new ServerEffectCommitCoordinator(ledger, trustedCatalog);
++    }
++
++    /** Allocates a new logical experiment and its first run entirely in-process. */
++    public synchronized StartedSession createExperiment() {
++        Session session = new Session(this, "cac-exp-" + UUID.randomUUID());
++        Attempt attempt = issue(session);
++        return new StartedSession(session, attempt);
++    }
++
++    /** A second run of this experiment is allowed ONLY after unclaimed abandonment. */
++    public synchronized RetryOutcome retry(Session session) {
++        if (!owns(session)) {
++            return new RetryOutcome(RetryStatus.INVALID_SESSION, null);
++        }
++        if (session.current != null) {
++            return new RetryOutcome(RetryStatus.ACTIVE_ATTEMPT, null);
++        }
++        if (session.claimedAny) {
++            return new RetryOutcome(RetryStatus.SETTLEMENT_HISTORY_PRESENT, null);
++        }
++        return new RetryOutcome(RetryStatus.STARTED, issue(session));
++    }
++
++    /** Reserves a calculation step under this exact active attempt. */
++    public synchronized WorldEffectLedger.BeginResult beginStep(Attempt attempt,
++                                                                 long stepIndex,
++                                                                 SimulationInterval interval) {
++        if (!owns(attempt) || stepIndex < 0 || interval == null) {
++            return WorldEffectLedger.BeginResult.INVALID;
++        }
++        if (!isCurrent(attempt)) {
++            return WorldEffectLedger.BeginResult.RUN_ABANDONED;
++        }
++        return ledger.beginCalculation(new CalculationStep(attempt.runId, stepIndex, interval));
++    }
++
++    /**
++     * Retires an unclaimed attempt. The old attempt may not submit late results;
++     * {@link #retry(Session)} can then create a new run ID for this same session.
++     */
++    public synchronized AbandonStatus abandon(Attempt attempt) {
++        if (!owns(attempt)) {
++            return AbandonStatus.INVALID_ATTEMPT;
++        }
++        if (attempt.abandoned) {
++            return AbandonStatus.ALREADY_ABANDONED;
++        }
++        if (!isCurrent(attempt)) {
++            return AbandonStatus.INVALID_ATTEMPT;
++        }
++        WorldEffectLedger.AbandonResult result = ledger.abandonRun(attempt.runId);
++        if (result == WorldEffectLedger.AbandonResult.HAS_SETTLEMENT_CLAIMS) {
++            return AbandonStatus.CLAIMS_PREVENT_ABANDONMENT;
++        }
++        // UNKNOWN_RUN means no step has yet been registered: there cannot be a
++        // claim, and private-ownership of the ledger prevents later registration
++        // by bypassing this scheduler. Thus an unused attempt may be retired.
++        if (result != WorldEffectLedger.AbandonResult.ABANDONED
++                && result != WorldEffectLedger.AbandonResult.UNKNOWN_RUN) {
++            throw new IllegalStateException("unexpected ledger abandonment: " + result);
++        }
++        attempt.abandoned = true;
++        attempt.session.current = null;
++        return AbandonStatus.ABANDONED;
++    }
++
++    /**
++     * Pure-Java revalidation plus claim, with the attempt fence held until the
++     * claim outcome is known. This does NOT write to the Minecraft world.
++     */
++    public synchronized Submission submit(Attempt attempt,
++                                          EnergyTransferCandidate candidate,
++                                          WorldEffectGate.Precheck precheck,
++                                          ServerWorldSnapshot current,
++                                          ServerMutationFacts facts) {
++        if (!owns(attempt)) {
++            return new Submission(SubmissionStatus.INVALID_ATTEMPT, null);
++        }
++        if (!isCurrent(attempt)) {
++            return new Submission(SubmissionStatus.STALE_ATTEMPT, null);
++        }
++        if (candidate == null || !attempt.runId.equals(candidate.step().calculationRunId())) {
++            return new Submission(candidate == null ? SubmissionStatus.INVALID_ATTEMPT
++                    : SubmissionStatus.FOREIGN_RUN, null);
++        }
++        var result = coordinator.submit(candidate, precheck, current, facts);
++        if (result == ServerEffectCommitCoordinator.Decision.SETTLEMENT_CLAIMED) {
++            attempt.session.claimedAny = true;
++            return new Submission(SubmissionStatus.CLAIMED, result);
++        }
++        return new Submission(SubmissionStatus.REJECTED_BY_COORDINATOR, result);
++    }
++
++    /** Records outcome only for an event claimed by this active attempt. */
++    public synchronized boolean markApplied(Attempt attempt, TransferEventKey key) {
++        return isCurrent(attempt) && belongsTo(attempt, key) && ledger.markApplied(key);
++    }
++
++    /** Records failure without allowing event retry or run replacement. */
++    public synchronized boolean markFailed(Attempt attempt, TransferEventKey key, String reason) {
++        return isCurrent(attempt) && belongsTo(attempt, key) && ledger.markFailed(key, reason);
++    }
++
++    public synchronized WorldEffectLedger.SettlementState stateOf(TransferEventKey key) {
++        return ledger.stateOf(key);
++    }
++
++    public synchronized int claimedTransferCount() {
++        return ledger.claimedTransferCount();
++    }
++
++    private Attempt issue(Session session) {
++        Attempt attempt = new Attempt(session, "cac-run-" + UUID.randomUUID(),
++                session.nextAttemptOrdinal++);
++        session.current = attempt;
++        return attempt;
++    }
++
++    private boolean owns(Session session) {
++        return session != null && session.owner == this;
++    }
++
++    private boolean owns(Attempt attempt) {
++        return attempt != null && owns(attempt.session);
++    }
++
++    private boolean isCurrent(Attempt attempt) {
++        return owns(attempt) && !attempt.abandoned && attempt.session.current == attempt;
++    }
++
++    private static boolean belongsTo(Attempt attempt, TransferEventKey key) {
++        return key != null && attempt.runId.equals(key.calculationRunId());
++    }
++}
+--- a/experiment-core/src/main/java/dev/coldatomcraft/experiment/world/TransferEventKey.java
++++ b/experiment-core/src/main/java/dev/coldatomcraft/experiment/world/TransferEventKey.java
+@@ -6,7 +6,9 @@
+  * <p>The event index is assigned by the solver and must be unique among all
+  * events of that step. Target identity, energy, position and read set are
+  * intentionally absent: a duplicate event cannot become new by changing its
+- * target or payload between submissions.</p>
++ * target or payload between submissions. The ledger also reserves a secondary
++ * (runId, stepIndex, eventIndex) slot, so switching the model ID or revision
++ * cannot produce two claims for the same event slot.</p>
+  */
+ public record TransferEventKey(String modelId, String modelRevision,
+                                String calculationRunId, long stepIndex, int eventIndex) {
+--- a/experiment-core/src/main/java/dev/coldatomcraft/experiment/world/WorldEffectLedger.java
++++ b/experiment-core/src/main/java/dev/coldatomcraft/experiment/world/WorldEffectLedger.java
+@@ -17,10 +17,12 @@
+  *       rejects a second execution, including a different step index covering an
+  *       overlapping interval in the same calculation run.</li>
+  *   <li>{@link #claim(EnergyTransferCandidate, WorldEffectGate.Precheck)} reserves
+- *       a transfer event exactly once immediately before the caller applies it.</li>
++ *       each (runId, stepIndex, eventIndex) slot at most once even if a caller
++ *       changes model provenance. The complete transfer key is retained for
++ *       diagnostics and outcome tracking.</li>
+  * </ul>
+  *
+- * <p><strong>Failure semantics:</strong> a claimed event is never claimable again.
++ * <p><strong>Failure semantics:</strong> a claimed event slot is never claimable again.
+  * The caller must call {@link #markApplied(TransferEventKey)} after success or
+  * {@link #markFailed(TransferEventKey, String)} after an exception/failure. A
+  * missing outcome record leaves the event {@code CLAIMED}; it is still not
+@@ -83,6 +85,10 @@
+     private final Map<StepKey, SimulationInterval> calculations = new HashMap<>();
+     private final Set<String> abandonedRuns = new HashSet<>();
+     private final Map<String, NavigableMap<Long, SimulationInterval>> intervalsByRun = new HashMap<>();
++    // Event identity is unique per (run, step, eventIndex), regardless of model
++    // or model revision. TransferEventKey deliberately carries model provenance,
++    // but changing provenance must NEVER create another settlement slot.
++    private final Map<EventSlot, TransferEventKey> claimedSlots = new HashMap<>();
+     private final Map<TransferEventKey, SettlementState> settlements = new HashMap<>();
+     private final Map<TransferEventKey, String> failureReasons = new HashMap<>();
+ 
+@@ -126,8 +132,8 @@
+     /**
+      * Must be called after a fresh {@link WorldEffectGate#precheck} and
+      * immediately before applying the effect. The first call for an event key
+-     * wins; every later submission is rejected regardless of payload changes or
+-     * previous application failure.
++     * wins; every later submission is rejected regardless of payload changes,
++     * model identity/revision changes, or previous application failure.
+      *
+      * <p>The precheck must have been produced for this exact candidate value.
+      * Matching only the event key is insufficient because the key deliberately
+@@ -160,12 +166,15 @@
+         }
+         // An already-settled event remains a duplicate regardless of any later
+         // payload edit, even if that edit would also fail step validation.
+-        if (settlements.containsKey(candidate.eventKey())) {
++        EventSlot slot = new EventSlot(candidate.step().calculationRunId(),
++                candidate.step().stepIndex(), candidate.eventIndex());
++        if (claimedSlots.containsKey(slot)) {
+             return ClaimResult.DUPLICATE_TRANSFER;
+         }
+         if (!registeredInterval.equals(candidate.step().interval())) {
+             return ClaimResult.STEP_INTERVAL_MISMATCH;
+         }
++        claimedSlots.put(slot, candidate.eventKey());
+         settlements.put(candidate.eventKey(), SettlementState.CLAIMED);
+         return ClaimResult.CLAIMED;
+     }
+@@ -269,5 +278,23 @@
+         return settlements.size();
+     }
+ 
++    /**
++     * Original successful claim at the provenance-independent physical event
++     * slot, if any. A later attempt with another model revision is rejected even
++     * though {@link #stateOf(TransferEventKey)} for the unused alternative key
++     * correctly reports UNCLAIMED.
++     */
++    public synchronized Optional<TransferEventKey> claimedEventForSlot(String runId,
++                                                                         long stepIndex,
++                                                                         int eventIndex) {
++        if (runId == null || runId.isBlank() || stepIndex < 0 || eventIndex < 0) {
++            return Optional.empty();
++        }
++        return Optional.ofNullable(claimedSlots.get(new EventSlot(runId, stepIndex, eventIndex)));
++    }
++
++
+     private record StepKey(String calculationRunId, long stepIndex) { }
++
++    private record EventSlot(String calculationRunId, long stepIndex, int eventIndex) { }
+ }
+--- a/experiment-core/src/test/java/dev/coldatomcraft/experiment/world/ExperimentRunSchedulerTest.java
++++ b/experiment-core/src/test/java/dev/coldatomcraft/experiment/world/ExperimentRunSchedulerTest.java
+@@ -0,0 +1,202 @@
++package dev.coldatomcraft.experiment.world;
++
++import org.junit.jupiter.api.Test;
++
++import java.util.concurrent.CountDownLatch;
++import java.util.concurrent.Executors;
++import java.util.concurrent.TimeUnit;
++
++import static dev.coldatomcraft.experiment.world.ContractTestSupport.ALL_SERVER_FACTS;
++import static dev.coldatomcraft.experiment.world.ContractTestSupport.TEST_MODEL_CATALOG;
++import static dev.coldatomcraft.experiment.world.ContractTestSupport.candidate;
++import static dev.coldatomcraft.experiment.world.ContractTestSupport.precheck;
++import static org.junit.jupiter.api.Assertions.*;
++
++/** Pure Java attempt fencing. Does NOT stand in for the missing server adapter. */
++class ExperimentRunSchedulerTest {
++    private static final SimulationInterval INTERVAL = new SimulationInterval(0, 1_000);
++
++    @Test
++    void sessionAndRunIdsAreIssuedAndDistinct() {
++        var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
++        var a = scheduler.createExperiment();
++        var b = scheduler.createExperiment();
++        assertNotEquals(a.session().sessionId(), b.session().sessionId());
++        assertNotEquals(a.attempt().runId(), b.attempt().runId());
++        assertEquals(0L, a.attempt().ordinal());
++        assertEquals(a.session().sessionId(), a.attempt().sessionId());
++        assertEquals(ExperimentRunScheduler.RetryStatus.ACTIVE_ATTEMPT,
++                scheduler.retry(a.session()).status());
++    }
++
++    @Test
++    void staleWorldRejectionThenAbandonThenFreshRunMayClaim() {
++        var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
++        var session = scheduler.createExperiment();
++        var world = new FakeWorldState();
++        var first = session.attempt();
++        assertEquals(WorldEffectLedger.BeginResult.STARTED, scheduler.beginStep(first, 0, INTERVAL));
++        var old = candidate(world, new CalculationStep(first.runId(), 0, INTERVAL), 0);
++        var check = precheck(world, old);
++        world.changeMirrorContent();
++        var stale = scheduler.submit(first, old, check, world.snapshot(), ALL_SERVER_FACTS);
++        assertEquals(ExperimentRunScheduler.SubmissionStatus.REJECTED_BY_COORDINATOR, stale.status());
++        assertEquals(ServerEffectCommitCoordinator.Decision.SERVER_REVALIDATION_FAILED,
++                stale.coordinatorDecision());
++        assertEquals(0, scheduler.claimedTransferCount());
++        assertEquals(ExperimentRunScheduler.AbandonStatus.ABANDONED, scheduler.abandon(first));
++        var replacement = scheduler.retry(session.session());
++        assertEquals(ExperimentRunScheduler.RetryStatus.STARTED, replacement.status());
++        var second = replacement.attempt();
++        assertNotEquals(first.runId(), second.runId());
++        assertEquals(1L, second.ordinal());
++        assertEquals(WorldEffectLedger.BeginResult.RUN_ABANDONED,
++                scheduler.beginStep(first, 1, new SimulationInterval(1_000, 2_000)));
++        assertEquals(ExperimentRunScheduler.SubmissionStatus.STALE_ATTEMPT,
++                scheduler.submit(first, old, check, world.snapshot(), ALL_SERVER_FACTS).status());
++        assertEquals(WorldEffectLedger.BeginResult.STARTED,
++                scheduler.beginStep(second, 0, INTERVAL));
++        var fresh = candidate(world, new CalculationStep(second.runId(), 0, INTERVAL), 0);
++        var result = scheduler.submit(second, fresh, precheck(world, fresh),
++                world.snapshot(), ALL_SERVER_FACTS);
++        assertTrue(result.claimed());
++        assertEquals(1, scheduler.claimedTransferCount());
++        assertEquals(ExperimentRunScheduler.AbandonStatus.CLAIMS_PREVENT_ABANDONMENT,
++                scheduler.abandon(second));
++    }
++
++    @Test
++    void unstartedAttemptCanBeAbandonedWithoutAllocatingLedgerSteps() {
++        var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
++        var created = scheduler.createExperiment();
++        assertEquals(ExperimentRunScheduler.AbandonStatus.ABANDONED,
++                scheduler.abandon(created.attempt()));
++        assertEquals(ExperimentRunScheduler.AbandonStatus.ALREADY_ABANDONED,
++                scheduler.abandon(created.attempt()));
++        assertEquals(ExperimentRunScheduler.RetryStatus.STARTED,
++                scheduler.retry(created.session()).status());
++    }
++
++    @Test
++    void afterClaimCannotAbandonOrRetryEvenIfMarkedFailed() {
++        var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
++        var created = scheduler.createExperiment();
++        var world = new FakeWorldState();
++        assertEquals(WorldEffectLedger.BeginResult.STARTED,
++                scheduler.beginStep(created.attempt(), 0, INTERVAL));
++        var transfer = candidate(world, new CalculationStep(created.attempt().runId(), 0, INTERVAL), 0);
++        assertTrue(scheduler.submit(created.attempt(), transfer, precheck(world, transfer),
++                world.snapshot(), ALL_SERVER_FACTS).claimed());
++        assertTrue(scheduler.markFailed(created.attempt(), transfer.eventKey(), "test-only partial effect"));
++        assertFalse(scheduler.markApplied(created.attempt(), transfer.eventKey()));
++        assertEquals(WorldEffectLedger.SettlementState.FAILED, scheduler.stateOf(transfer.eventKey()));
++        assertEquals(ExperimentRunScheduler.AbandonStatus.CLAIMS_PREVENT_ABANDONMENT,
++                scheduler.abandon(created.attempt()));
++        assertEquals(ExperimentRunScheduler.RetryStatus.ACTIVE_ATTEMPT,
++                scheduler.retry(created.session()).status());
++    }
++
++    @Test
++    void foreignAttemptFromAnotherSchedulerCannotAccessThisLedger() {
++        var a = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
++        var b = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
++        var attempt = a.createExperiment().attempt();
++        assertEquals(WorldEffectLedger.BeginResult.INVALID, b.beginStep(attempt, 0, INTERVAL));
++        assertEquals(ExperimentRunScheduler.AbandonStatus.INVALID_ATTEMPT, b.abandon(attempt));
++        assertEquals(ExperimentRunScheduler.SubmissionStatus.INVALID_ATTEMPT,
++                b.submit(attempt, null, null, null, null).status());
++    }
++
++    @Test
++    void mismatchedRunIdCannotSubmitToCurrentAttempt() {
++        var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
++        var created = scheduler.createExperiment();
++        var world = new FakeWorldState();
++        assertEquals(WorldEffectLedger.BeginResult.STARTED,
++                scheduler.beginStep(created.attempt(), 0, INTERVAL));
++        var wrong = candidate(world, new CalculationStep("forged-different-run", 0, INTERVAL), 0);
++        var result = scheduler.submit(created.attempt(), wrong, precheck(world, wrong),
++                world.snapshot(), ALL_SERVER_FACTS);
++        assertEquals(ExperimentRunScheduler.SubmissionStatus.FOREIGN_RUN, result.status());
++        assertEquals(0, scheduler.claimedTransferCount());
++    }
++
++    @Test
++    void wrongModelOrRevokedPermissionDoNotConsumeAttempt() {
++        var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
++        var created = scheduler.createExperiment();
++        var world = new FakeWorldState();
++        scheduler.beginStep(created.attempt(), 0, INTERVAL);
++        var transfer = candidate(world, new CalculationStep(created.attempt().runId(),0,INTERVAL),0);
++        var revoked = new ServerMutationFacts(true, true, true, true, true, false);
++        var result = scheduler.submit(created.attempt(), transfer, precheck(world, transfer),
++                world.snapshot(), revoked);
++        assertEquals(ExperimentRunScheduler.SubmissionStatus.REJECTED_BY_COORDINATOR,result.status());
++        assertEquals(0, scheduler.claimedTransferCount());
++        assertEquals(ExperimentRunScheduler.AbandonStatus.ABANDONED, scheduler.abandon(created.attempt()));
++    }
++
++    @Test
++    void separateSessionsAreNotADeviceTimeExclusivityGuarantee() {
++        // DOCUMENTED GAP: no authoritative apparatus / physical-operation identity
++        // is associated with these sessions. Both different run IDs can reserve
++        // the same simulated interval for the same world device/target.
++        // A real server scheduler MUST disallow this where effects can overlap.
++        var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
++        var first = scheduler.createExperiment().attempt();
++        var second = scheduler.createExperiment().attempt();
++        var world = new FakeWorldState();
++        assertEquals(WorldEffectLedger.BeginResult.STARTED,
++                scheduler.beginStep(first, 0, INTERVAL));
++        assertEquals(WorldEffectLedger.BeginResult.STARTED,
++                scheduler.beginStep(second, 0, INTERVAL));
++        var a = candidate(world, new CalculationStep(first.runId(), 0, INTERVAL), 0);
++        var b = candidate(world, new CalculationStep(second.runId(), 0, INTERVAL), 0);
++        assertTrue(scheduler.submit(first, a, precheck(world,a), world.snapshot(), ALL_SERVER_FACTS).claimed());
++        assertTrue(scheduler.submit(second, b, precheck(world,b), world.snapshot(), ALL_SERVER_FACTS).claimed());
++        assertEquals(2, scheduler.claimedTransferCount(),
++                "current scheduler does not deduplicate independently created physical sessions");
++    }
++
++    @Test
++    void claimAndAbandonRaceCannotBothWin() throws Exception {
++        for (int repetition = 0; repetition < 60; repetition++) {
++            var scheduler = new ExperimentRunScheduler(TEST_MODEL_CATALOG);
++            var created = scheduler.createExperiment();
++            var world = new FakeWorldState();
++            scheduler.beginStep(created.attempt(), 0, INTERVAL);
++            var transfer = candidate(world, new CalculationStep(created.attempt().runId(),0,INTERVAL),0);
++            var check = precheck(world,transfer);
++            var ready = new CountDownLatch(2);
++            var go = new CountDownLatch(1);
++            var pool = Executors.newFixedThreadPool(2);
++            try {
++                var submit = pool.submit(() -> {
++                    ready.countDown();
++                    if (!go.await(10, TimeUnit.SECONDS)) throw new AssertionError("submit timeout");
++                    return scheduler.submit(created.attempt(), transfer, check,
++                            world.snapshot(), ALL_SERVER_FACTS).status();
++                });
++                var abandon = pool.submit(() -> {
++                    ready.countDown();
++                    if (!go.await(10, TimeUnit.SECONDS)) throw new AssertionError("abandon timeout");
++                    return scheduler.abandon(created.attempt());
++                });
++                assertTrue(ready.await(10, TimeUnit.SECONDS));
++                go.countDown();
++                var claimResult = submit.get(10, TimeUnit.SECONDS);
++                var abandonResult = abandon.get(10, TimeUnit.SECONDS);
++                assertTrue((claimResult == ExperimentRunScheduler.SubmissionStatus.CLAIMED
++                        && abandonResult == ExperimentRunScheduler.AbandonStatus.CLAIMS_PREVENT_ABANDONMENT)
++                        || (claimResult == ExperimentRunScheduler.SubmissionStatus.STALE_ATTEMPT
++                        && abandonResult == ExperimentRunScheduler.AbandonStatus.ABANDONED));
++                assertEquals(claimResult == ExperimentRunScheduler.SubmissionStatus.CLAIMED ? 1 : 0,
++                        scheduler.claimedTransferCount());
++            } finally {
++                go.countDown();
++                pool.shutdownNow();
++                assertTrue(pool.awaitTermination(10, TimeUnit.SECONDS));
++            }
++        }
++    }
++}
+--- a/experiment-core/src/test/java/dev/coldatomcraft/experiment/world/LedgerEventSlotTest.java
++++ b/experiment-core/src/test/java/dev/coldatomcraft/experiment/world/LedgerEventSlotTest.java
+@@ -0,0 +1,118 @@
++package dev.coldatomcraft.experiment.world;
++
++import dev.coldatomcraft.experiment.ModelApproval;
++import dev.coldatomcraft.experiment.ModelDefinition;
++import dev.coldatomcraft.experiment.ModelVerification;
++import org.junit.jupiter.api.Test;
++
++import java.util.concurrent.CountDownLatch;
++import java.util.concurrent.Executors;
++import java.util.concurrent.TimeUnit;
++
++import static dev.coldatomcraft.experiment.world.ContractTestSupport.STEP;
++import static dev.coldatomcraft.experiment.world.ContractTestSupport.candidate;
++import static dev.coldatomcraft.experiment.world.ContractTestSupport.precheck;
++import static org.junit.jupiter.api.Assertions.*;
++
++/** D2 regressions: provenance variations must not create new event slots. */
++class LedgerEventSlotTest {
++    private static EnergyTransferCandidate withModel(EnergyTransferCandidate source,
++                                                       String id, String revision) {
++        return new EnergyTransferCandidate(id, revision, source.sourceDevice(), source.target(),
++                source.absorbedEnergyJoules(), source.step(), source.eventIndex(), source.readSet());
++    }
++
++    private static WorldEffectGate.Precheck check(FakeWorldState world, EnergyTransferCandidate transfer) {
++        var model = new ModelDefinition(transfer.modelId(), transfer.modelRevision(),
++                "synthetic-test-model", ModelApproval.OWNER_APPROVED,
++                ModelVerification.NUMERICALLY_VERIFIED);
++        return WorldEffectGate.precheck(transfer, model, world.readSet(), world.device(), world.target());
++    }
++
++    @Test
++    void changedModelRevisionCannotReclaimSameEventIndex() {
++        var world = new FakeWorldState();
++        var ledger = new WorldEffectLedger();
++        assertEquals(WorldEffectLedger.BeginResult.STARTED, ledger.beginCalculation(STEP));
++        var first = candidate(world, STEP, 0);
++        var revised = withModel(first, first.modelId(), "REV-B");
++        assertTrue(precheck(world, first).allowed());
++        assertTrue(check(world, revised).allowed());
++        assertEquals(WorldEffectLedger.ClaimResult.CLAIMED, ledger.claim(first, precheck(world, first)));
++        assertEquals(WorldEffectLedger.ClaimResult.DUPLICATE_TRANSFER,
++                ledger.claim(revised, check(world, revised)));
++        assertEquals(1, ledger.claimedTransferCount());
++        assertEquals(first.eventKey(), ledger.claimedEventForSlot(STEP.calculationRunId(),
++                STEP.stepIndex(), 0).orElseThrow());
++        assertEquals(WorldEffectLedger.SettlementState.UNCLAIMED, ledger.stateOf(revised.eventKey()));
++    }
++
++    @Test
++    void changedModelIdentityCannotReclaimEvenAfterTerminalOutcome() {
++        var world = new FakeWorldState();
++        var ledger = new WorldEffectLedger();
++        ledger.beginCalculation(STEP);
++        var first = candidate(world, STEP, 0);
++        assertEquals(WorldEffectLedger.ClaimResult.CLAIMED, ledger.claim(first, precheck(world, first)));
++        assertTrue(ledger.markApplied(first.eventKey()));
++        var different = withModel(first, "DIFFERENT-TEST-MODEL", "Q");
++        assertEquals(WorldEffectLedger.ClaimResult.DUPLICATE_TRANSFER,
++                ledger.claim(different, check(world, different)));
++        assertEquals(WorldEffectLedger.SettlementState.APPLIED, ledger.stateOf(first.eventKey()));
++    }
++
++    @Test
++    void differentEventIndicesAndDifferentStepsRemainLegal() {
++        var world = new FakeWorldState();
++        var ledger = new WorldEffectLedger();
++        var later = new CalculationStep(STEP.calculationRunId(), 1, new SimulationInterval(1000, 2000));
++        assertEquals(WorldEffectLedger.BeginResult.STARTED, ledger.beginCalculation(STEP));
++        assertEquals(WorldEffectLedger.BeginResult.STARTED, ledger.beginCalculation(later));
++        var a = candidate(world, STEP, 0);
++        var b = candidate(world, STEP, 1);
++        var c = candidate(world, later, 0);
++        assertEquals(WorldEffectLedger.ClaimResult.CLAIMED, ledger.claim(a, precheck(world,a)));
++        assertEquals(WorldEffectLedger.ClaimResult.CLAIMED, ledger.claim(b, precheck(world,b)));
++        assertEquals(WorldEffectLedger.ClaimResult.CLAIMED, ledger.claim(c, precheck(world,c)));
++        assertEquals(3, ledger.claimedTransferCount());
++    }
++
++    @Test
++    void modelRevisionRaceClaimsAtMostOnce() throws Exception {
++        var world = new FakeWorldState();
++        var ledger = new WorldEffectLedger();
++        ledger.beginCalculation(STEP);
++        var first = candidate(world, STEP, 0);
++        var revised = withModel(first, first.modelId(), "REV-B");
++        var firstCheck = precheck(world, first);
++        var secondCheck = check(world, revised);
++        var ready = new CountDownLatch(2);
++        var go = new CountDownLatch(1);
++        var pool = Executors.newFixedThreadPool(2);
++        try {
++            var a = pool.submit(() -> {
++                ready.countDown();
++                if (!go.await(10, TimeUnit.SECONDS)) throw new AssertionError("timeout");
++                return ledger.claim(first, firstCheck);
++            });
++            var b = pool.submit(() -> {
++                ready.countDown();
++                if (!go.await(10, TimeUnit.SECONDS)) throw new AssertionError("timeout");
++                return ledger.claim(revised, secondCheck);
++            });
++            assertTrue(ready.await(10, TimeUnit.SECONDS));
++            go.countDown();
++            var ar = a.get(10, TimeUnit.SECONDS);
++            var br = b.get(10, TimeUnit.SECONDS);
++            assertTrue((ar == WorldEffectLedger.ClaimResult.CLAIMED &&
++                    br == WorldEffectLedger.ClaimResult.DUPLICATE_TRANSFER)
++                    || (br == WorldEffectLedger.ClaimResult.CLAIMED &&
++                    ar == WorldEffectLedger.ClaimResult.DUPLICATE_TRANSFER));
++            assertEquals(1, ledger.claimedTransferCount());
++        } finally {
++            go.countDown();
++            pool.shutdownNow();
++            assertTrue(pool.awaitTermination(10, TimeUnit.SECONDS));
++        }
++    }
++}
+--- a/verification/Smoke.java
++++ b/verification/Smoke.java
+@@ -14,6 +14,7 @@
+ import dev.coldatomcraft.experiment.world.DevicePlacement;
+ import dev.coldatomcraft.experiment.world.DeviceSnapshot;
+ import dev.coldatomcraft.experiment.world.EnergyTransferCandidate;
++import dev.coldatomcraft.experiment.world.ExperimentRunScheduler;
+ import dev.coldatomcraft.experiment.world.ServerEffectCommitCoordinator;
+ import dev.coldatomcraft.experiment.world.ServerEffectGate;
+ import dev.coldatomcraft.experiment.world.ServerMutationFacts;
+@@ -280,6 +281,70 @@
+                     "race test executor terminates");
+         }
+ 
++        // M0-R2.1-D2: eventIndex is unique per run+step, not per model revision.
++        var slotLedger = new WorldEffectLedger();
++        var slotStep = new CalculationStep("run-slot", 0, new SimulationInterval(0, 500));
++        check(slotLedger.beginCalculation(slotStep) == WorldEffectLedger.BeginResult.STARTED,
++                "slot guard step reserved");
++        var slotA = new EnergyTransferCandidate("THM-001", "A", device, target,
++                1.5, slotStep, 0, readSet);
++        var slotB = new EnergyTransferCandidate("THM-001", "B", device, target,
++                1.5, slotStep, 0, readSet);
++        var verifiedB = new ModelDefinition("THM-001", "B", "test-only:THM-001-B",
++                ModelApproval.OWNER_APPROVED, ModelVerification.NUMERICALLY_VERIFIED);
++        check(slotLedger.claim(slotA, WorldEffectGate.precheck(slotA, verified,
++                readSet, device, target)) == WorldEffectLedger.ClaimResult.CLAIMED,
++                "initial event slot claimed");
++        check(slotLedger.claim(slotB, WorldEffectGate.precheck(slotB, verifiedB,
++                readSet, device, target)) == WorldEffectLedger.ClaimResult.DUPLICATE_TRANSFER,
++                "model revision cannot duplicate claimed event slot");
++        check(slotLedger.claimedTransferCount() == 1, "event slot counted exactly once");
++
++        // Server-issued logical session: abandoning a stale unclaimed attempt
++        // fences late arrivals; replay can only run under the same session's
++        // replacement attempt. This does not substitute for world authority.
++        var scheduler = new ExperimentRunScheduler(catalog);
++        var session = scheduler.createExperiment();
++        var initialAttempt = session.attempt();
++        check(initialAttempt.runId().startsWith("cac-run-"), "run token minted by scheduler");
++        check(scheduler.beginStep(initialAttempt, 0, new SimulationInterval(0, 500))
++                == WorldEffectLedger.BeginResult.STARTED, "logical attempt step reserved");
++        var original = new EnergyTransferCandidate("THM-001", "A", device, target,
++                1.5, new CalculationStep(initialAttempt.runId(), 0,
++                new SimulationInterval(0, 500)), 0, readSet);
++        var initialPrecheck = WorldEffectGate.precheck(original, verified, readSet, device, target);
++        check(scheduler.retry(session.session()).status()
++                == ExperimentRunScheduler.RetryStatus.ACTIVE_ATTEMPT,
++                "cannot duplicate active attempt");
++        check(scheduler.abandon(initialAttempt) == ExperimentRunScheduler.AbandonStatus.ABANDONED,
++                "stale unclaimed attempt retired");
++        check(scheduler.submit(initialAttempt, original, initialPrecheck,
++                currentWorld, allFacts).status() == ExperimentRunScheduler.SubmissionStatus.STALE_ATTEMPT,
++                "late result from retired attempt blocked");
++        var next = scheduler.retry(session.session());
++        check(next.status() == ExperimentRunScheduler.RetryStatus.STARTED,
++                "replacement attempt issued");
++        check(!next.attempt().runId().equals(initialAttempt.runId()),
++                "replacement has different run identity");
++        check(scheduler.beginStep(next.attempt(), 0, new SimulationInterval(0, 500))
++                == WorldEffectLedger.BeginResult.STARTED,
++                "replacement can reserve same simulated interval");
++        var replacementEffect = new EnergyTransferCandidate("THM-001", "A", device, target,
++                1.5, new CalculationStep(next.attempt().runId(), 0,
++                new SimulationInterval(0, 500)), 0, readSet);
++        var replacementCheck = WorldEffectGate.precheck(replacementEffect, verified,
++                readSet, device, target);
++        check(scheduler.submit(next.attempt(), replacementEffect, replacementCheck,
++                currentWorld, allFacts).claimed(), "new run claims one valid result");
++        check(scheduler.abandon(next.attempt())
++                == ExperimentRunScheduler.AbandonStatus.CLAIMS_PREVENT_ABANDONMENT,
++                "claimed run cannot be replaced");
++        check(scheduler.claimedTransferCount() == 1, "replacement claimed count is one");
++        var secondScheduler = new ExperimentRunScheduler(catalog);
++        check(secondScheduler.beginStep(next.attempt(), 1, new SimulationInterval(500, 1000))
++                == WorldEffectLedger.BeginResult.INVALID,
++                "foreign scheduler cannot use another scheduler token");
++
+         System.out.println("PASS: " + checked + " standalone engineering checks; no physics models claimed");
+     }
+ }

@@ -1,0 +1,108 @@
+name: ColdAtomCraft CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  java25:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      # Java 25 must be installed before any Java compilation or test.
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: gradle
+
+      - name: Verify Java and Gradle wrapper
+        run: |
+          java -version
+          javac -version
+          chmod +x gradlew
+          ./gradlew --version
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Offline Java smoke and asset schema tests
+        run: |
+          bash tools/verify-core.sh
+          python verification/M0-R2.1-D5/verify_optics_reference.py
+          python verification/M0-R2.1-D6/verify_coherent_reference.py
+          python verification/M0-R2.1-D7/verify_optical_path_reference.py
+          python verification/M0-R2.1-D8/verify_fresnel_reference.py
+          python verification/M0-R2.1-D9/verify_detector_reference.py
+          bash verification/D10-placeholder/run_preview_offline.sh
+          python tools/test_preview_assets.py
+          python -m unittest discover -s verification -p 'test_*.py' -v
+          python tools/validate_assets.py assets/manifests/laser_source.example.json
+
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: JDK 25 tests and NeoForge mod build
+        run: ./gradlew clean :physics-core:test :experiment-core:test :neoforge-mod:build --no-daemon --stacktrace
+
+      - name: Inspect distributable JAR
+        run: |
+          set -euo pipefail
+          jar_file="$(find neoforge-mod/build/libs -maxdepth 1 -type f -name 'coldatomcraft-*.jar' | head -n 1)"
+          test -n "$jar_file"
+          echo "JAR=$jar_file"
+          jar tf "$jar_file" | tee jar-contents.txt
+          for required in \
+            META-INF/neoforge.mods.toml \
+            dev/coldatomcraft/neoforge/ColdAtomCraft.class \
+            dev/coldatomcraft/physics/Vec3.class \
+            dev/coldatomcraft/experiment/world/EnergyTransferCandidate.class
+          do
+            grep -F "$required" jar-contents.txt
+          done
+          unzip -p "$jar_file" META-INF/neoforge.mods.toml
+
+      - name: Check all compiled classes and actual JUnit XML
+        run: |
+          set -euo pipefail
+          jar_file="$(find neoforge-mod/build/libs -maxdepth 1 -type f -name 'coldatomcraft-*.jar' | head -n 1)"
+          test -n "$jar_file"
+          python tools/inspect_mod_jar.py --jar "$jar_file" --root .
+          python - <<'PYTHON'
+          from pathlib import Path
+          import sys
+          sys.path.insert(0, 'tools')
+          from verify_m0 import junit_evidence, missing_junit_suites, MINIMUM_JUNIT_TEST_COUNT
+          counts = junit_evidence(Path('.'))
+          print('Actual JUnit XML:', counts)
+          assert counts['tests'] >= MINIMUM_JUNIT_TEST_COUNT
+          assert counts['failures'] == counts['errors'] == counts['skipped'] == 0
+          assert counts['files'] >= 2
+          assert not missing_junit_suites(Path('.'))
+          PYTHON
+
+      - name: Upload JUnit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CAC-M0-R2.1-D10-preview-junit-reports
+          path: |
+            physics-core/build/test-results/test/*.xml
+            experiment-core/build/test-results/test/*.xml
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload NeoForge JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: CAC-M0-R2.1-D10-preview-neoforge
+          path: neoforge-mod/build/libs/*.jar
+          retention-days: 14

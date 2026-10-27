@@ -1,0 +1,14 @@
+﻿M0-R2 static boundary scan
+Generated: 2026-10-26 00:54:44 -06:00
+
+Pure core / no Minecraft imports: PASS (no matches)
+Pure core / no client-only references: PASS (no matches)
+Production ModelDefinition construction: PASS (none)
+Source/config EULA=true, RCON password, proxy settings: PASS (none)
+
+JAR PASS dev/coldatomcraft/physics/Vec3.class
+JAR PASS dev/coldatomcraft/experiment/ModelCatalog.class
+JAR PASS dev/coldatomcraft/experiment/world/WorldEffectLedger.class
+JAR PASS dev/coldatomcraft/neoforge/ColdAtomCraft.class
+JAR PASS META-INF/neoforge.mods.toml
+JUnit totals: tests=49 failures=0 errors=0 skipped=0

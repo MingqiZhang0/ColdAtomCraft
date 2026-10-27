@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="dev.coldatomcraft.experiment.world.WorldEffectLedgerTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-26T06:46:49.162Z" hostname="DESKTOP-A4M7O81" time="0.031">
+  <properties/>
+  <testcase name="appliedAndFailedOutcomesAreTerminalAndNotRetried()" classname="dev.coldatomcraft.experiment.world.WorldEffectLedgerTest" time="0.006"/>
+  <testcase name="duplicateCannotBecomeNewByChangingTargetOrPayload()" classname="dev.coldatomcraft.experiment.world.WorldEffectLedgerTest" time="0.001"/>
+  <testcase name="unrecordedOutcomeRemainsClaimedAndCannotBeRetried()" classname="dev.coldatomcraft.experiment.world.WorldEffectLedgerTest" time="0.001"/>
+  <testcase name="rejectsRepeatedCalculationStepAndOverlappingIntervals()" classname="dev.coldatomcraft.experiment.world.WorldEffectLedgerTest" time="0.001"/>
+  <testcase name="newLedgerAfterRestartDoesNotGuaranteeCrossRestartIdempotency()" classname="dev.coldatomcraft.experiment.world.WorldEffectLedgerTest" time="0.001"/>
+  <testcase name="refusesUnregisteredCalculationAndRejectedPrecheck()" classname="dev.coldatomcraft.experiment.world.WorldEffectLedgerTest" time="0.001"/>
+  <testcase name="distinctEventIndicesInOneStepAreClaimedSeparately()" classname="dev.coldatomcraft.experiment.world.WorldEffectLedgerTest" time="0.001"/>
+  <testcase name="concurrentClaimsProduceExactlyOneWinner()" classname="dev.coldatomcraft.experiment.world.WorldEffectLedgerTest" time="0.015"/>
+  <testcase name="claimsEachTransferEventExactlyOnce()" classname="dev.coldatomcraft.experiment.world.WorldEffectLedgerTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

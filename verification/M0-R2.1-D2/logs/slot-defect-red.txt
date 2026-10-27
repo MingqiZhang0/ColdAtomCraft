@@ -1,0 +1,12 @@
+D1 SOURCE: ColdAtomCraft-M0-R2.1-D1-DirectorCheckpoint.zip
+Java 21, compiled all physics-core and experiment-core main sources without Minecraft.
+Standalone red probe: same runId=run-one, stepIndex=0, eventIndex=0; model revisions A then B.
+ACTUAL BEFORE FIX:
+A: CLAIMED
+B: CLAIMED
+Claim count: 2
+EXPECTED AFTER FIX:
+A: CLAIMED
+B: DUPLICATE_TRANSFER
+Claim count: 1
+This is a synthetic contract test, not a physical owner-approved model or game-world effect.

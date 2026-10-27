@@ -1,0 +1,1 @@
+PASS assets/manifests/laser_source.example.json: SPEC ONLY (no model files claimed)

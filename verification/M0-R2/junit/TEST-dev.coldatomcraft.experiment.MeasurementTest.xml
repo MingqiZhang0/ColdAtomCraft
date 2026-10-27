@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="dev.coldatomcraft.experiment.MeasurementTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-26T06:46:49.035Z" hostname="DESKTOP-A4M7O81" time="0.032">
+  <properties/>
+  <testcase name="rejectsNegativeUncertainty()" classname="dev.coldatomcraft.experiment.MeasurementTest" time="0.026"/>
+  <testcase name="modelRequiresOwnerReference()" classname="dev.coldatomcraft.experiment.MeasurementTest" time="0.002"/>
+  <testcase name="allowsZeroNoiseAsAnExplicitIdealizedInstrument()" classname="dev.coldatomcraft.experiment.MeasurementTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

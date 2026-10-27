@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="dev.coldatomcraft.experiment.world.WorldEffectGateTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-26T06:46:49.145Z" hostname="DESKTOP-A4M7O81" time="0.015">
+  <properties/>
+  <testcase name="rejectsChangedDeviceStateAndMovedTarget()" classname="dev.coldatomcraft.experiment.world.WorldEffectGateTest" time="0.001"/>
+  <testcase name="rejectsReadSetWithoutDeviceOrTargetChunk()" classname="dev.coldatomcraft.experiment.world.WorldEffectGateTest" time="0.002"/>
+  <testcase name="rejectsChangedIntermediateChunkInMultiChunkPath()" classname="dev.coldatomcraft.experiment.world.WorldEffectGateTest" time="0.001"/>
+  <testcase name="acceptsCurrentCompleteSnapshotAsPrecheckOnly()" classname="dev.coldatomcraft.experiment.world.WorldEffectGateTest" time="0.002"/>
+  <testcase name="rejectsStaleChunkContentAndReloadEpoch()" classname="dev.coldatomcraft.experiment.world.WorldEffectGateTest" time="0.001"/>
+  <testcase name="rejectsMissingInputsAndInvalidCandidates()" classname="dev.coldatomcraft.experiment.world.WorldEffectGateTest" time="0.002"/>
+  <testcase name="rejectsModelProblemsIndependently()" classname="dev.coldatomcraft.experiment.world.WorldEffectGateTest" time="0.002"/>
+  <testcase name="rejectsUnloadedDeviceOrTarget()" classname="dev.coldatomcraft.experiment.world.WorldEffectGateTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

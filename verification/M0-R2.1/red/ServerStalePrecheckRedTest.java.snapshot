@@ -1,0 +1,33 @@
+package dev.coldatomcraft.experiment.world;
+
+import org.junit.jupiter.api.Test;
+
+import static dev.coldatomcraft.experiment.world.ContractTestSupport.ALL_SERVER_FACTS;
+import static dev.coldatomcraft.experiment.world.ContractTestSupport.STEP;
+import static dev.coldatomcraft.experiment.world.ContractTestSupport.candidate;
+import static dev.coldatomcraft.experiment.world.ContractTestSupport.precheck;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * Failing-first reproduction for P1-03.
+ *
+ * <p>This test intentionally uses the M0-R2 authorization API, which had no
+ * current-world input at all. It is replaced by
+ * {@link ServerEffectCommitCoordinatorTest} after the contract fix; the RED run
+ * is retained under {@code verification/M0-R2.1/red/}.</p>
+ */
+class ServerStalePrecheckRedTest {
+
+    @Test
+    void staleAllowedPrecheckMustNotAuthorizeAfterIntermediateChunkChanged() {
+        FakeWorldState world = new FakeWorldState();
+        var candidate = candidate(world, STEP, 0);
+        var stalePrecheck = precheck(world, candidate);
+        assertTrue(stalePrecheck.allowed());
+
+        world.changeMirrorContent();
+
+        assertFalse(ServerEffectGate.authorize(stalePrecheck, ALL_SERVER_FACTS).allowed());
+    }
+}

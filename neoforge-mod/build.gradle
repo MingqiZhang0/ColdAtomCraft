@@ -1,0 +1,161 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.148'
+    id 'idea'
+}
+
+java { toolchain.languageVersion = JavaLanguageVersion.of(25) }
+
+base { archivesName = mod_id }
+
+neoForge {
+    // Official MDG alternative pipeline: use NeoForge's precompiled game
+    // artifacts instead of the local decompile/recompile pipeline. This avoids
+    // the NFRT 2.0.31 javac failure writing package-info.class on this host,
+    // while all project source sets are still compiled by javac 25.
+    enable {
+        version = project.neo_version
+        disableRecompilation = true
+    }
+    runs {
+        client {
+            client()
+            // Optional, explicit smoke-run argument. Default client launch is unchanged.
+            // Example: -PcacQuickPlayWorld="New World"
+            if (project.hasProperty('cacQuickPlayWorld')) {
+                programArguments.add('--quickPlaySingleplayer')
+                programArguments.add(project.property('cacQuickPlayWorld').toString())
+            }
+        }
+        server { server(); programArgument '--nogui' }
+        gameTestServer { type = 'gameTestServer' }
+    }
+    mods {
+        "${mod_id}" { sourceSet sourceSets.main }
+    }
+}
+
+
+dependencies {
+    implementation project(':physics-core')
+    implementation project(':experiment-core')
+}
+
+// Bundle pure-Java project outputs in the distributable mod JAR rather
+// than assuming users install separate non-mod JARs as NeoForge mods.
+tasks.named('jar', Jar) {
+    dependsOn project(':physics-core').tasks.named('classes')
+    dependsOn project(':experiment-core').tasks.named('classes')
+    from { project(':physics-core').sourceSets.main.output }
+    from { project(':experiment-core').sourceSets.main.output }
+    duplicatesStrategy = DuplicatesStrategy.FAIL
+}
+
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+
+// Fail the build if a distributable JAR loses the pure-core classes or the
+// loader metadata. This catches the "works in dev, broken release JAR" case.
+var verifyDistributableJar = tasks.register('verifyDistributableJar') {
+    group = 'verification'
+    description = 'Verify required core classes and NeoForge metadata in the mod JAR'
+    dependsOn tasks.named('jar')
+    def jarFile = tasks.named('jar', Jar).flatMap { it.archiveFile }
+    inputs.file(jarFile)
+    doLast {
+        def required = [
+            'META-INF/neoforge.mods.toml',
+            'dev/coldatomcraft/neoforge/ColdAtomCraft.class',
+            'dev/coldatomcraft/physics/Vec3.class',
+            'dev/coldatomcraft/physics/BeamInputs.class',
+            'dev/coldatomcraft/experiment/ModelDefinition.class',
+            'dev/coldatomcraft/experiment/world/EnergyTransferCandidate.class',
+            'dev/coldatomcraft/experiment/world/WorldEffectGate.class',
+            'dev/coldatomcraft/experiment/world/WorldEffectGate$Precheck.class',
+            'dev/coldatomcraft/experiment/world/WorldEffectLedger.class',
+            'dev/coldatomcraft/experiment/world/WorldEffectLedger$ClaimResult.class',
+            'dev/coldatomcraft/experiment/world/ServerWorldSnapshot.class',
+            'dev/coldatomcraft/experiment/world/ServerEffectGate.class',
+            'dev/coldatomcraft/experiment/world/ServerEffectCommitCoordinator.class',
+            'dev/coldatomcraft/experiment/world/ServerMutationFacts.class',
+            'dev/coldatomcraft/experiment/world/ExperimentRunScheduler.class',
+            'dev/coldatomcraft/experiment/world/ExperimentReservation.class',
+            'dev/coldatomcraft/experiment/world/ApparatusKey.class',
+            'dev/coldatomcraft/experiment/world/ServerTickWindow.class',
+            'dev/coldatomcraft/experiment/world/DevicePlacement.class',
+            'dev/coldatomcraft/experiment/PreviewOpticalBench.class',
+            'dev/coldatomcraft/experiment/PreviewBeamRoute.class',
+            'dev/coldatomcraft/neoforge/preview/PreviewBlocks.class',
+            'dev/coldatomcraft/neoforge/preview/DiagnosticLaserBlock.class',
+            'dev/coldatomcraft/neoforge/preview/DiagnosticPowerMeterBlock.class',
+            'dev/coldatomcraft/neoforge/preview/DiagnosticBeamScan.class',
+            'assets/coldatomcraft/blockstates/diagnostic_laser.json',
+            'assets/coldatomcraft/blockstates/diagnostic_power_meter.json',
+            'assets/coldatomcraft/models/block/diagnostic_laser_off.json',
+            'assets/coldatomcraft/models/block/diagnostic_laser_on.json',
+            'assets/coldatomcraft/models/block/diagnostic_power_meter_0.json',
+            'assets/coldatomcraft/models/block/diagnostic_power_meter_1.json',
+            'assets/coldatomcraft/models/block/diagnostic_power_meter_2.json',
+            'assets/coldatomcraft/items/diagnostic_laser.json',
+            'assets/coldatomcraft/items/diagnostic_power_meter.json',
+            'assets/coldatomcraft/lang/en_us.json',
+            'assets/coldatomcraft/lang/zh_cn.json',
+            'data/coldatomcraft/loot_table/blocks/diagnostic_laser.json',
+            'data/coldatomcraft/loot_table/blocks/diagnostic_power_meter.json'
+        ]
+        def forbidden = [
+            'dev/coldatomcraft/experiment/world/FakeWorldState.class',
+            'dev/coldatomcraft/experiment/world/ServerStalePrecheckRedTest.class',
+            'dev/coldatomcraft/verification/Smoke.class',
+            'dev/coldatomcraft/verification/LedgerBenchmark.class'
+        ]
+        new java.util.zip.ZipFile(jarFile.get().asFile).withCloseable { zip ->
+            required.each { path ->
+                if (zip.getEntry(path) == null) {
+                    throw new GradleException("distributable JAR is missing ${path}")
+                }
+            }
+            forbidden.each { path ->
+                if (zip.getEntry(path) != null) {
+                    throw new GradleException("distributable JAR contains test/probe artifact ${path}")
+                }
+            }
+            def metadata = zip.getEntry('META-INF/neoforge.mods.toml')
+            def text = zip.getInputStream(metadata).getText('UTF-8')
+            [
+                "modId=\"${mod_id}\"",
+                "version=\"${mod_version}\"",
+                'modId="neoforge"',
+                'modId="minecraft"'
+            ].each { needle ->
+                if (!text.contains(needle)) {
+                    throw new GradleException("mod metadata does not contain ${needle}")
+                }
+            }
+        }
+        logger.lifecycle("Verified distributable JAR: ${jarFile.get().asFile}")
+    }
+}
+tasks.named('check') { dependsOn verifyDistributableJar }
+
+var generateModMetadata = tasks.register('generateModMetadata', ProcessResources) {
+    def props = [
+        minecraft_version: minecraft_version,
+        minecraft_version_range: minecraft_version_range,
+        neo_version: neo_version,
+        mod_id: mod_id,
+        mod_name: mod_name,
+        mod_license: mod_license,
+        mod_version: mod_version
+    ]
+    inputs.properties(props)
+    expand(props)
+    from 'src/main/templates'
+    into 'build/generated/sources/modMetadata'
+}
+sourceSets.main.resources.srcDir generateModMetadata
+neoForge.ideSyncTask generateModMetadata
+
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }

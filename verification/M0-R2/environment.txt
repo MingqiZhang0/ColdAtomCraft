@@ -1,0 +1,45 @@
+Cold Atom Craft — M0-R2 environment and evidence
+Captured: 2026-10-26 00:47:59 -06:00 (America/Denver)
+
+Working copy: E:\ColdAtomCraft\ColdAtomCraft-M0-R2
+Host OS: Windows 11 amd64 (Gradle javaToolchains/OS report)
+Shell: Windows PowerShell 5.1
+Python: 3.14.2
+
+--- Java ---
+openjdk version "25.0.3" 2026-04-21 LTS
+OpenJDK Runtime Environment Temurin-25.0.3+9 (build 25.0.3+9-LTS)
+OpenJDK 64-Bit Server VM Temurin-25.0.3+9 (build 25.0.3+9-LTS, mixed mode, sharing)
+javac 25.0.3
+
+--- Gradle (from wrapper-version.log) ---
+Gradle 9.2.1
+Build time: 2025-11-17 13:40:48 UTC
+Revision: 30ecdc708db275e8f8769ea0620f6dd919a58f76
+Launcher JVM: 25.0.3 (Eclipse Adoptium 25.0.3+9-LTS)
+Daemon JVM: F:\Eclipse Temurin JDK (no JDK specified, using current Java home)
+OS: Windows 11 10.0 amd64
+
+--- Minecraft / NeoForge ---
+Minecraft 26.3
+NeoForge 26.3.0.99
+ModDevGradle 2.0.148 (disableRecompilation = true)
+Gradle 9.2.1
+
+--- GPU / display (from client log) ---
+Created window using SDL video driver: windows
+OpenGL 3.3.0, Intel(R) Iris(R) Xe Graphics; NVIDIA GeForce RTX 3050 Laptop GPU detected
+
+--- External environment notes ---
+A local HTTP proxy at 127.0.0.1:10090 was used only for dependency downloads (configured outside the project).
+No proxy host/port or credentials are committed in the source tree.
+The NeoFormRuntime default decompile/recompile path failed on this host; official disableRecompilation was used.
+The dedicated-server test run used a local RCON password supplied only at runtime; it is not stored in the project.
+No EULA file was created by the development server; no EULA acceptance was written by this work.
+
+--- Commands ---
+.\gradlew.bat clean :physics-core:test :experiment-core:test :neoforge-mod:build --no-build-cache --rerun-tasks --no-daemon --console=plain --stacktrace
+.\gradlew.bat :neoforge-mod:runClient
+.\gradlew.bat :neoforge-mod:runClient -PcacQuickPlayWorld="New World"
+.\gradlew.bat :neoforge-mod:runServer
+python E:\ColdAtomCraft\.tooling\rcon_stop.py (local RCON stop; password not stored in project)

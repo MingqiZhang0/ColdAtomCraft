@@ -1,0 +1,1464 @@
+--- D8/.github/workflows/ci.yml
++++ D9/.github/workflows/ci.yml
+@@ -41,6 +41,7 @@
+           python verification/M0-R2.1-D6/verify_coherent_reference.py
+           python verification/M0-R2.1-D7/verify_optical_path_reference.py
+           python verification/M0-R2.1-D8/verify_fresnel_reference.py
++          python verification/M0-R2.1-D9/verify_detector_reference.py
+           python -m unittest discover -s verification -p 'test_*.py' -v
+           python tools/validate_assets.py assets/manifests/laser_source.example.json
+ 
+@@ -90,7 +91,7 @@
+         if: always()
+         uses: actions/upload-artifact@v4
+         with:
+-          name: CAC-M0-R2.1-D8-junit-reports
++          name: CAC-M0-R2.1-D9-junit-reports
+           path: |
+             physics-core/build/test-results/test/*.xml
+             experiment-core/build/test-results/test/*.xml
+@@ -100,6 +101,6 @@
+       - name: Upload NeoForge JAR
+         uses: actions/upload-artifact@v4
+         with:
+-          name: CAC-M0-R2.1-D8-neoforge
++          name: CAC-M0-R2.1-D9-neoforge
+           path: neoforge-mod/build/libs/*.jar
+           retention-days: 14
+--- D8/README.md
++++ D9/README.md
+@@ -1,3 +1,51 @@
++# CAC M0-R2.1-D9 — Ideal experimental optical-power observation (2026-10-26)
++
++**D9 is an offline scientific/measurement REFERENCE, not a calibrated hardware
++instrument, an Owner-approved production model or a playable NeoForge detector.**
++M0 JDK25/NeoForge runtime remains unverified for this D9 source.
++
++This checkpoint retains D5 Gaussian beams, D6 complex/Jones fields, D7
++matched-mode phase/beam-splitter optics and D8 geometric/Fresnel interfaces,
++then adds a **finite circular-aperture ideal power receiver**:
++
++- `GaussianCircularAperture`: centred closed-form and decentered numerical TEM00
++  power integration, with captured/uncollected W budget;
++- `IdealCircularDetectorFace`: lab-local 3D front-facing normal-incidence
++  geometry, including lateral offset and coordinate-ULP checks;
++- `IdealOpticalPowerMeter`: explicit ideal W observation, time stamp, zero
++  *idealized model* uncertainty, no invented calibration/electronics;
++- coherent Mach–Zehnder two-port finite-aperture measurements.
++
++Independent Decimal80 Poisson/Gamma reference comparisons and optional SciPy
++stress checks cross-validate the different numerical integration method.
++**A virtual reading never consumes optical power or authorizes world effects.**
++
++**D9 independently executed:** 383/383 engineering smoke; 287/287
++JUnit-source methods via an explicitly NON-JUNIT offline runner; 30/30 Python
++engineering tests; 17/17 D9 power-meter smoke; 26/26 new Decimal80 aperture
++reference values and 1,500/1,500 optional seeded SciPy comparisons. Original
++D5–D8 reference oracles also passed. **Formal JDK25 is BLOCKED (exit 2),
++D9 NeoForge build/runtime NOT RUN.** See the D9 audit for exact evidence.
++
++D9 offline checks:
++
++```bash
++sh verification/M0-R2.1-D9/run_d9_offline.sh
++sh verification/M0-R2.1-D3/run_local_offline.sh
++```
++
++Formal on a prepared JDK25/NeoForge machine:
++
++```bash
++python tools/verify_m0.py
++```
++
++Read [D9 physical assumptions](docs/OPT_001_IDEAL_POWER_DETECTION.md),
++[D9 evidence](verification/M0-R2.1-D9/README.md), and
++[D9 director audit](docs/M0_R2_1_D9_AUDIT.md).
++
++---
++
+ # CAC M0-R2.1-D8 — 3D experimental reflection/Fresnel scientific reference (2026-10-26)
+ 
+ **D8 is an offline Physics Core draft, NOT a playable NeoForge mod or an
+--- D8/docs/ARCHITECTURE.md
++++ D9/docs/ARCHITECTURE.md
+@@ -1,3 +1,20 @@
++## D9 ideal optical power observation: pure science vs instrument boundary
++
++`physics-core/optics/GaussianCircularAperture` integrates a circular Gaussian
++aperture (including offset) and maintains collected/uncollected optical W.
++`IdealCircularDetectorFace` declares a lab-local front-facing detector normal;
++reverse and oblique incidence or insufficient coordinate resolution fail closed.
++`experiment-core/IdealOpticalPowerMeter` converts this calculated **ideal optical
++power** into an immutable SI Measurement at a declared simulation timestamp.
++It is an observer, not a powered device, photodiode electronics model, world
++mutation, or approved Material/BIO model. It accepts matched D7 mode power at
++its reference plane or a single D5 Gaussian plus perpendicular face. D8's
++geometric Jones ray alone cannot supply a spatial beam profile.
++
++This reference leaves instrument calibration, Blender geometry/units, real
++NeoForge authority, detector absorption and measurement noise for separate
++Owner-governed work. See `docs/OPT_001_IDEAL_POWER_DETECTION.md`.
++
+ ## D8 geometric optical interfaces (draft, no NeoForge adapter)
+ 
+ `physics-core` now has a *separate* finite ray/port reference in
+--- D8/docs/CHANGELOG.md
++++ D9/docs/CHANGELOG.md
+@@ -1,3 +1,16 @@
++## CAC-M0-R2.1-D9 — 2026-10-26 (ideal optical power observation)
++
++- Added finite circular Gaussian aperture integration with displaced aperture
++  and robust analytic centred limit; power budget remains optical only.
++- Added front-facing, normal-incidence 3D detector face with lab-coordinate
++  precision rejection; no Minecraft block units assumed.
++- Added an ideal, noninvasive W-valued `Measurement` adapter with explicit
++  zero-model-uncertainty labeling, not a real instrument calibration.
++- Added JUnit SOURCE tests, standalone power smoke, dependency-free Decimal80
++  reference oracle, optional SciPy stress, and JDK25 CI/verification wiring.
++- **Did not** add laser damage, heat, sensor electronic noise, Owner production
++  approval, or actual Blender/NeoForge device integration.
++
+ ## CAC-M0-R2.1-D8 · 2026-10-26 · Geometric optical interface and mirror reference
+ 
+ - Added right-handed `RayFrame3`, `GeometricJonesRay`, `LaboratoryJonesAmplitude`,
+--- D8/docs/DECISIONS.md
++++ D9/docs/DECISIONS.md
+@@ -1,3 +1,17 @@
++## CAC-D9-01 — finite-aperture ideal power observation (2026-10-26)
++
++- Owner explicitly chose standard real experimental optics. Engineering
++  selects the standard TEM00 disk integral as the **DRAFT numerical reference**
++  for the first ideal power readout, NOT as approval of any real detector model.
++- Detector normal points toward incoming light; only beam-normal incidence is
++  accepted; lab-local SI metres and explicit offset are mandatory.
++- Misalignment and finite aperture affect the reading; missing power is never
++  silently assigned to heating. The reading is a noninvasive observer.
++- Instrument responsivity, noise, spectral/temporal bandwidth and saturation
++  remain unspecified until Owner or actual device data is available.
++- D8 ray-only spatial power is not accepted as a Gaussian finite-aperture mode.
++- JDK25/NeoForge launch verification remains a separate hard gate.
++
+ ## CAC D8 optical-science engineering decision (2026-10-26)
+ 
+ - An uncoated dielectric Fresnel boundary and a real coated laboratory mirror
+--- D8/docs/M0_R2_1_D9_AUDIT.md
++++ D9/docs/M0_R2_1_D9_AUDIT.md
+@@ -0,0 +1,108 @@
++# CAC-M0-R2.1-D9 — Code director scientific and engineering audit
++
++**Date:** 2026-10-26
++
++**Scope:** Pure Java reference for ideal finite-aperture optical power
++observations, based on SHA-verified frozen D8. Does NOT authorize a calibrated
++hardware model, Minecraft damage or M0 release.
++
++## Baseline and immutable artifacts
++
++- D8 input: `ColdAtomCraft-M0-R2.1-D8-DirectorCheckpoint.zip`.
++- D8 input SHA-256: `63fc3421bb23cf4227528175f1c9f8ee80d5310758bc0584e1460e1ab2369268`.
++- D8 preflight: **313/313** SHA-256 entries matched and ZIP CRC clean.
++- Version pin unchanged: Minecraft 26.3, NeoForge 26.3.0.99, JDK25 required,
++  Gradle 9.2.1, ModDevGradle 2.0.148, official `disableRecompilation` mode.
++
++## D9 production code
++
++1. `GaussianCircularAperture`: bounded power budget; centred analytic Gaussian
++   disk integral plus 96-point transformed Gauss-Legendre integral for lateral
++   offset, independently checked against a noncentral chi-square CDF.
++2. `IdealCircularDetectorFace`: explicit lab-local 3D centre, front-face
++   normal, aperture radius; rejects reverse/oblique incidence and clearly
++   unresolvable absolute-coordinate input.
++3. `IdealOpticalPowerMeter`: stable instrument identity, ideal collected W,
++   simulation timestamp, explicit zero *model* standard uncertainty and
++   captured-versus-uncaptured budget. It does not mutate the optical field or
++   Minecraft and makes no claim of hardware calibration.
++
++The integrator's 9*w cutoff omits less than exp(-162) of normalized tail
++power; general IEEE754 error certification is out of scope. The D8 ray-only
++state lacks a finite beam profile; a matched D7 Gaussian mode or a D5 Gaussian
++source is required for aperture sampling.
++
++## Independent local evidence
++
++| Scope | Status | Evidence |
++|---|---|---|
++| D8 frozen integrity | PASS 313/313 | SHA inspection before development |
++| Pure Java engineering smoke | PASS 383/383 | `verification/M0-R2.1-D9/d9-all-smokes-final.log` |
++| D5 Gaussian smoke | PASS 21 | same |
++| D6 coherent smoke | PASS 19 | same |
++| D7 path smoke | PASS 19 | same |
++| D8 geometric Fresnel smoke | PASS 18 | same |
++| D9 ideal detector smoke | PASS 17 | same |
++| Entire Java JUnit *SOURCE* executed in independent offline shim | PASS 287/287, **NOT FORMAL JUNIT** | `d9-java-offline-final.log` |
++| Python engineering tests | PASS 30/30 | `d9-python-tools-final.log` |
++| D5 Decimal80 oracle | PASS 36 | `d5-oracle-retained.log` |
++| D6 Decimal70 oracle | PASS 39 | `d6-oracle-retained.log` |
++| D7 Decimal80 oracle | PASS 29 | `d7-oracle-retained.log` |
++| D8 Decimal80 Fresnel oracle | PASS 146 | `d8-oracle-retained.log` |
++| D9 independent Decimal80 aperture oracle | PASS 26/26 | `d9-decimal80-final.log` |
++| D9 optional SciPy seeded noncentral-chi-square sweep | PASS 1,500 pairs, worst abs error ~1.09e-13 | `d9-optional-scipy-final.log` |
++| Java21 `--release 21 -Xlint:all -Werror` | PASS | `d9-all-smokes-final.log` (javac command in run script) |
++| JDK25 formal preflight | BLOCKED, exit 2 (only OpenJDK21) | `jdk25-preflight/report.json` |
++| Actual JDK25 Gradle/JUnit and distributable D9 JAR | NOT RUN | No JDK25 / dependency network here |
++| D9 NeoForge client/server launch and Blender device | NOT RUN / NOT IMPLEMENTED | No D9 compiled mod JAR or owner equipment |
++
++One chained D5–D9 offline script attempt was interrupted by this runtime
++without a completed result; it is **not** counted as PASS. The individual
++smokes and reference-oracle scripts were then independently rerun and passed,
++with logs archived above.
++
++## Numerical results and performance
++
++For ideal 20 mW Gaussian at a detector where `w=0.5 mm`, with an aperture
++radius of `a=0.5 mm`:
++
++- Coaxial `d=0`: F=1-exp(-2) ~= 0.864664716763, P_collected ~= 17.2932943353 mW.
++- Decentred `d=0.5 mm`: F ~= 0.396499039388, P_collected ~= 7.92998078776 mW.
++
++A limited Java21 exploratory microbenchmark (100k samples with varying
++offsets, warm-up) observed roughly **59 ns/sample** for the centred analytic
++path and **4.95 microseconds/sample** for the offset quadrature path on this
++host. These numbers are not JMH-calibrated and do NOT imply any Minecraft TPS
++or production throughput. Avoid per-particle/per-tick unbounded sampling.
++
++## Remaining engineering/science gates
++
++- No Owner-specified sensor wavelength response, quantum efficiency,
++  electrical transfer curve, calibration standard, bandwidth, uncertainty,
++  thermal properties, saturation or damage threshold.
++- No detector block registration, real face material, optical interception,
++  real world occlusion, Blender port transform or calibrated MC-to-metres scale.
++- `Measurement.standardUncertainty=0` is an ideal deterministic observation
++  convention; never treat it as measured zero uncertainty.
++- No physically absorbing in-line power meter; the ideal power probe is
++  noninvasive and must not be inserted as a power sink in a simulation without
++  a separate approved power/energy transfer model.
++- No multi-mode interference integral, unmatched spatial modes, oblique
++  collection, finite pixelated detector or time-dependent optical response.
++- M0 formal JDK25 Gradle/JUnit/JAR verification and **D9** game runtime must
++  be executed on a prepared real JDK25 build host. Prior R2 startup logs are
++  not evidence for this version.
++- `ModelCatalog` receives **no production OWNER_APPROVED model**. The Owner
++  retains scientific and final milestone signoff authority.
++
++## Director decision
++
++**D9 numerical reference: REVIEW READY (offline checks PASS).**
++**M0 formal gate: OPEN / JDK25 BLOCKED.**
++**D9 production game detector: NOT IMPLEMENTED.**
++
++Next engineering action on a prepared host: run `python tools/verify_m0.py`,
++archive formal JUnit XML, inspect D9 JAR, then independently load it in a
++Minecraft 26.3 + NeoForge 26.3.0.99 instance. After that, attach a user-owned
++Blender detector mesh to a real world optical input anchor and validate
++geometry/scale; do not fabricate calibration values.
+--- D8/docs/M1_SCIENCE_INTAKE.md
++++ D9/docs/M1_SCIENCE_INTAKE.md
+@@ -1,3 +1,15 @@
++## D9 future owner-science intake — instrument-specific parameters
++
++The current D9 power-meter reference needs NO arbitrary calibration constants:
++it reports only the aperture-integrated ideal optical W. When Owner supplies
++an actual detector model, explicitly request its active area, aperture
++geometry and axis, spectral responsivity or calibrated W transfer function,
++measurement time averaging, bandwidth, noise/uncertainty, saturation,
++reflection/absorption and face location in the local laboratory frame.
++Do not infer these from a Blender mesh or treat missed aperture power as heat.
++The first Blender power-meter model will also require an explicit incoming
++optical port anchor and declared metre-to-world spatial mapping.
++
+ ## D8 physical optics reference, still needing Owner apparatus parameters
+ 
+ D8 adds three-dimensional ray reflection, uncoated single-interface Fresnel
+--- D8/docs/OPT_001_IDEAL_POWER_DETECTION.md
++++ D9/docs/OPT_001_IDEAL_POWER_DETECTION.md
+@@ -0,0 +1,139 @@
++# CAC-OPT-001-D9 — Ideal finite-aperture optical power observation
++
++**Scientific status: DRAFT numerical reference, not Owner-approved instrument
++calibration or NeoForge gameplay.** This document describes what the code
++actually computes, not capabilities of a fabricated photodiode or Blender asset.
++
++## 1. Why the D7/D8 power value is not a power-meter reading
++
++`ParaxialModeField.powerWatts()` is the integral of an ideal matched TEM00 mode
++over an infinite transverse reference plane, not the optical power incident on
++an arbitrarily sized/misaligned receiver. D8's `GeometricJonesRay.powerWatts()`
++does not carry a finite transverse profile at all. Taking either value as an
++arbitrary finite detector reading would erase important alignment effects.
++
++A real optical power meter has wavelength-dependent responsivity, beam-size
++acceptance, linearity, damage thresholds, finite electronic bandwidth and
++traceable calibration uncertainties. None of those empirical parameters are
++known for Owner's future Blender instrument; they are NOT invented here.
++
++## 2. Gaussian ideal receiver aperture
++
++The incident monochromatic paraxial TEM00 irradiance is
++
++    I(r) = 2 P / (pi w^2) * exp(-2 r^2 / w^2),     [W/m^2]
++
++where `w` is the **1/e^2 intensity radius at the detector plane**, not
++necessarily the initial waist `w0`. A centred circular entrance aperture of
++radius `a` collects
++
++    P_collected(d=0) = P * (1 - exp(-2 a^2 / w^2)).
++
++For lateral displacement `d` of the aperture centre from the beam axis,
++
++    F(a,d,w) = (2/(pi*w^2)) * integral_{|r-d|<=a} exp(-2*r^2/w^2) d^2 r
++    P_collected = P * F.
++
++The exact CDF can also be expressed as the noncentral-chi-square distribution
++with 2 degrees of freedom, noncentrality `4(d/w)^2` and threshold `4(a/w)^2`.
++An independent 80-digit Decimal Poisson/Gamma-mixture implementation in
++`verification/M0-R2.1-D9/verify_detector_reference.py` checks the Java code.
++
++The Java implementation uses the angular fraction of each irradiance ring,
++combined with 96-point Gauss-Legendre quadrature and a `sin^2` endpoint
++transformation. The centred case is analytic and uses `-expm1` for accuracy.
++The radial tail beyond `9 w` carries less than `exp(-162)` of total power.
++Precision is independently tested over 26 reference cases, including large
++nearly tangent apertures; it is NOT a theorem guaranteeing arbitrary extreme
++IEEE-754 input ranges.
++
++**Illustrative standard-reference values** for `P=20 mW`, `w=0.5 mm`:
++
++| aperture radius | lateral offset | collected power |
++| --- | --- | --- |
++| 0.5 mm | 0 | approx 17.2933 mW |
++| 0.5 mm | 0.5 mm | approx 7.9300 mW |
++
++`GaussianCircularAperture.Capture` records incident, collected and uncollected
++optical power. The uncollected portion is an *optical bookkeeping deficit*;
++it is NOT asserted to be absorbed heat or lost to an in-world block.
++
++## 3. Geometry and incident-side convention
++
++`IdealCircularDetectorFace` takes a lab-local face centre, a front-facing unit
++normal and positive radius. The normal points **towards the incoming light**;
++the supported normally incident configuration requires `n dot k = -1` up to
++roundoff tolerance. Tilted faces and backside pickup are rejected rather than
++silently evaluated using a wrong normal-incidence Gaussian disk formula.
++
++Detector centre and beam waist position are specified in **laboratory-local
++metres**, never Minecraft block coordinates. A coordinate ULP larger than the
++relevant beam/aperture feature size is rejected; precise local-origin
++conversion must be handled by a future instrument-placement adapter.
++
++The Gaussian waist may geometrically lie before or after the reference plane;
++no source emission port or intervening occluder is inferred. A real apparatus
++adapter must additionally validate that a source is actually emitting toward
++this face and that no block or optical component interrupts the path.
++
++## 4. Instrument observation, interference and time
++
++`IdealOpticalPowerMeter.sampleMode` accepts a D7 matched Gaussian output mode
++and a supplied transverse detector offset at **that same reference plane**.
++It takes the finite-aperture integral of the mode's total optical power,
++including the effect of its complex Jones amplitude and coherent two-port
++interference already computed by the optical path solver.
++
++`sampleAtFace` accepts D5 `GaussianBeam` and a D9 oriented detector face.
++It requires exact declared equality of the meter/face aperture radius; it
++does not infer an optical-world conversion factor.
++
++Both return a `Measurement` with observable
++`ideal_collected_optical_power`, unit `W`, a nonnegative simulation timestamp,
++and `standardUncertainty=0` **only as the ideal deterministic model
++convention**. Zero here does NOT certify a real device uncertainty, nor does
++this discrete reading model provide detector bandwidth, time averaging,
++noise, photodiode current, voltage or saturation.
++
++The observation is **noninvasive**: querying a modal state does not consume
++its optical power. Do not represent a physical absorbing in-line photodiode
++without explicitly modelling the optical termination, reflection/absorption,
++and energy conservation. Likewise, counterpropagating field `|E|^2` is NOT a
++power meter's absorbed optical power; this module only accepts single matched
++travelling-mode ports or a normally incident single Gaussian beam.
++
++## 5. Exclusions and hard follow-up gates
++
++- No calibrated photodiode, spectral/electrical responsivity or NIST-traceable
++  uncertainty estimate.
++- No finite-angle vector diffraction, oblique collection, angled/curved
++  detector, occultation, pixel response or clipping propagation downstream.
++- No detector modelling for a D8 `GeometricJonesRay` lacking a finite Gaussian
++  mode. D8 Fresnel geometry must be explicitly associated with a valid mode
++  before aperture power can be calculated; the current project does not
++  silently treat a ray as a finite beam.
++- No multi-mode overlap integral, spatially mismatched coherent beams,
++  finite-bandwidth detector signal or photodetection shot-noise model.
++- No real Minecraft detector block, Blender asset, registered Owner-approved
++  production model, world heating or damage.
++
++## 6. Verification and status
++
++- D8 frozen manifest independently checked before starting D9.
++- New D9 JUnit5 test source covers formula limits, offset, numeric bounds,
++  3D face geometry, backside/tilt rejection, coordinate precision, MZI two-port
++  readings, noninvasive observation and invalid inputs.
++- D9 standalone Java21 smoke checks the physics/experiment bridge.
++- 26 independently computed Decimal80 noncentral-chi-square CDF reference cases.
++- Full JDK25 Gradle/JUnit/JAR and NeoForge game integration remain separate,
++  **not inferred** from Java21 offline checks.
++
++**References:**
++
++1. N. R. Barbeau, *Power deposited by a Gaussian beam on a decentered circular
++   aperture*, Applied Optics 34, 6443–6445 (1995), DOI 10.1364/AO.34.006443.
++2. *Low-cost Gaussian beam profiling with circular irises and apertures*,
++   Applied Optics 58, 1048 (2019), DOI 10.1364/AO.58.001048.
++3. NIST SP 250-75, *cw Laser Power and Energy Calibrations at NIST*,
++   https://doi.org/10.6028/NIST.SP.250-75 (detector calibration and uncertainty
++   are separate real instrument problems, NOT implemented in D9).
+--- D8/docs/PHYSICS_MODEL_CONTRACT.md
++++ D9/docs/PHYSICS_MODEL_CONTRACT.md
+@@ -1,3 +1,14 @@
++## D9 addition — ideal observation is not an approved physical sensor
++
++The D9 optical power meter integrates the standard TEM00 irradiance over a
++finite coaxial or laterally decentered circular aperture, using laboratory-local
++metres and SI watts. It is a DRAFT deterministic observation model. The
++existing `Measurement(... standardUncertainty=0 ...)` means an idealized
++model with no experimental/electronic uncertainty, **not** a calibrated or
++NIST-traceable instrument. Real responsivity, bandwidth, detector material,
++heat and damage require separate Owner-approved models. No ModelCatalog
++approval status is changed; an observation never grants world-mutation rights.
++
+ ## D8 reference amendment: optical surface geometry (DRAFT ONLY)
+ 
+ The real-optics request authorizes studying standard experimental models,
+--- D8/docs/TEST_PLAN.md
++++ D9/docs/TEST_PLAN.md
+@@ -1,3 +1,23 @@
++## D9 optical measurement additions (2026-10-26, draft)
++
++- Two new physics-core JUnit5 SOURCE classes test centred/decentred TEM00
++  finite-aperture power, geometry/translation/rotation covariance, wrong-side
++  and oblique-face rejection and large-coordinate precision loss.
++- One new experiment-core JUnit5 SOURCE class tests ideal SI watt readings,
++  noninvasiveness, simulation timestamps, Mach–Zehnder complementary ports,
++  offset, free-space enlargement, and missing calibration authority.
++- D9 standalone Java smoke: 17 checks. Independent Decimal80 power-aperture
++  CDF oracle: 26 scenarios, derived from noncentral chi-square/Gamma/Poisson,
++  independent of Java's angular quadrature.
++- Optional SciPy reference stress: 1,500 seeded offset cases. This is not a
++  mandatory dependency and must never be counted as a formal Java test.
++- **Formal test count floor: 287** (255 prior + 32 D9 @Test source methods).
++  `tools/verify_m0.py` additionally requires XML for EVERY present *Test.java
++  class and requires the actual D9 compiled classes inside the distributable
++  JAR. Offline reflection testing is not formal JUnit.
++- D9 JDK25 Gradle/JUnit, packaged JAR and actual NeoForge runtime: pending on
++  an appropriate prepared environment, not inferred from old R2 startup logs.
++
+ ## CAC D8 reference verification (2026-10-26)
+ 
+ - D7 baseline verified 287/287 SHA-256 before modifications.
+--- D8/experiment-core/src/main/java/dev/coldatomcraft/experiment/IdealOpticalPowerMeter.java
++++ D9/experiment-core/src/main/java/dev/coldatomcraft/experiment/IdealOpticalPowerMeter.java
+@@ -0,0 +1,75 @@
++package dev.coldatomcraft.experiment;
++
++import dev.coldatomcraft.physics.optics.GaussianBeam;
++import dev.coldatomcraft.physics.optics.GaussianCircularAperture;
++import dev.coldatomcraft.physics.optics.IdealCircularDetectorFace;
++import dev.coldatomcraft.physics.optics.ParaxialModeField;
++
++/**
++ * An ideal, noninvasive simulated optical-power probe with a finite circular
++ * entrance aperture. This is a reference observable, not an actual calibrated
++ * photodiode, an absorbing in-path component, or a server-authoritative device.
++ *
++ * <p>The reading is collected optical power in watts, with ideal model
++ * uncertainty zero. Real detector calibration, responsivity, spectral range,
++ * electronics noise, temperature dependence, saturation, finite bandwidth,
++ * power/heat deposition, and measurement disturbance require separate models
++ * and Owner-provided parameters.</p>
++ */
++public record IdealOpticalPowerMeter(String deviceId, double apertureRadiusMeters) {
++    public IdealOpticalPowerMeter {
++        if (deviceId == null || deviceId.isBlank()
++                || !Double.isFinite(apertureRadiusMeters) || apertureRadiusMeters <= 0) {
++            throw new IllegalArgumentException("meter identity and positive finite aperture radius required");
++        }
++    }
++
++    /**
++     * Sample a collinear, matched TEM00 mode at its declared optical reference
++     * plane. Lateral offset is explicitly supplied in metres. The mode is NOT
++     * deleted or attenuated by this virtual measurement.
++     */
++    public Reading sampleMode(ParaxialModeField field, double offsetMeters,
++                              long simulatedTimeNanos) {
++        if (field == null) throw new IllegalArgumentException("modal field required");
++        return reading(GaussianCircularAperture.capture(
++                field.powerWatts(), field.q().radiusMeters(field.vacuumWavelengthMeters()),
++                apertureRadiusMeters, offsetMeters), simulatedTimeNanos);
++    }
++
++    /**
++     * Sample an oriented detector face against a laboratory-local Gaussian.
++     * The detector and this meter must declare the SAME entrance radius;
++     * an unknown implicit aperture mapping is not permitted.
++     */
++    public Reading sampleAtFace(GaussianBeam beam, IdealCircularDetectorFace face,
++                                long simulatedTimeNanos) {
++        if (face == null || face.apertureRadiusMeters() != apertureRadiusMeters) {
++            throw new IllegalArgumentException("face and meter aperture radius must match exactly");
++        }
++        return reading(face.capture(beam), simulatedTimeNanos);
++    }
++
++    private Reading reading(GaussianCircularAperture.Capture capture,
++                            long simulatedTimeNanos) {
++        if (simulatedTimeNanos < 0) {
++            throw new IllegalArgumentException("nonnegative simulated time required");
++        }
++        Measurement ideal = new Measurement(deviceId, "ideal_collected_optical_power",
++                "W", capture.capturedPowerWatts(), 0.0, simulatedTimeNanos);
++        return new Reading(ideal, capture);
++    }
++
++    /** Both measured fraction and uncollected part are accounted, never heat. */
++    public record Reading(Measurement observation,
++                          GaussianCircularAperture.Capture apertureBudget) {
++        public Reading {
++            if (observation == null || apertureBudget == null
++                    || !"W".equals(observation.siUnit())
++                    || !"ideal_collected_optical_power".equals(observation.observable())
++                    || Double.compare(observation.value(), apertureBudget.capturedPowerWatts()) != 0) {
++                throw new IllegalArgumentException("inconsistent ideal optical reading");
++            }
++        }
++    }
++}
+--- D8/experiment-core/src/test/java/dev/coldatomcraft/experiment/IdealOpticalPowerMeterTest.java
++++ D9/experiment-core/src/test/java/dev/coldatomcraft/experiment/IdealOpticalPowerMeterTest.java
+@@ -0,0 +1,114 @@
++package dev.coldatomcraft.experiment;
++
++import dev.coldatomcraft.physics.Vec3;
++import dev.coldatomcraft.physics.optics.*;
++import org.junit.jupiter.api.Test;
++import static org.junit.jupiter.api.Assertions.*;
++
++class IdealOpticalPowerMeterTest {
++    private static ParaxialModeField input() {
++        var plane=new GaussianPlane(0.02,780e-9,new GaussianQ(0,0.8));
++        return ParaxialModeField.fromPlane("owner-calibrated-phase-placeholder",
++                "port-frame-placeholder",plane,
++                new JonesVector(ComplexAmplitude.ONE,ComplexAmplitude.ZERO),0);
++    }
++
++    @Test void givesWattsAndExplicitlyIdealObservable() {
++        var meter=new IdealOpticalPowerMeter("power-meter-1",0.0004);
++        var result=meter.sampleMode(input(),0,123456789);
++        assertEquals("power-meter-1",result.observation().deviceId());
++        assertEquals("W",result.observation().siUnit());
++        assertEquals("ideal_collected_optical_power",result.observation().observable());
++        assertEquals(0,result.observation().standardUncertainty(),0);
++        assertEquals(123456789,result.observation().simulatedTimeNanos());
++        assertTrue(result.observation().value()>0 && result.observation().value()<0.02);
++    }
++
++    @Test void detectorSamplingDoesNotModifyOrConsumeTheOpticalMode() {
++        var mode=input();
++        var result=new IdealOpticalPowerMeter("detector",0.0003).sampleMode(mode,0,0);
++        assertEquals(0.02,mode.powerWatts(),1e-15);
++        assertEquals(0.02,result.apertureBudget().incidentPowerWatts(),1e-15);
++        assertEquals(0.02,result.apertureBudget().capturedPowerWatts()
++                +result.apertureBudget().uncapturedPowerWatts(),1e-15);
++    }
++
++    @Test void coherentMachZehnderOutputsProduceComplementaryDetectorReadings() {
++        var splitter=new IdealTwoPortBeamSplitter(0.5);
++        var arms=splitter.split(input());
++        var meter0=new IdealOpticalPowerMeter("output0",0.0004);
++        var meter1=new IdealOpticalPowerMeter("output1",0.0004);
++        double fraction=GaussianCircularAperture.capturedFraction(input().q().radiusMeters(780e-9),0.0004,0);
++        for(double delta:new double[]{0,Math.PI/6,Math.PI/2,Math.PI}) {
++            var out=splitter.scatter(arms.output0(),arms.output1().withUniformPhaseRadians(delta));
++            var read0=meter0.sampleMode(out.output0(),0,0);
++            var read1=meter1.sampleMode(out.output1(),0,0);
++            assertEquals(0.02*fraction,read0.observation().value()+read1.observation().value(),2e-13);
++            assertEquals(0.02*fraction*Math.pow(Math.sin(delta/2),2),read0.observation().value(),2e-13);
++            assertEquals(0.02*fraction*Math.pow(Math.cos(delta/2),2),read1.observation().value(),2e-13);
++        }
++    }
++
++    @Test void centeredDetectorReadsPowerAfterIdealSplitInTwoPorts() {
++        var split=new IdealTwoPortBeamSplitter(0.5).split(input());
++        var meter=new IdealOpticalPowerMeter("meter",0.001);
++        var r0=meter.sampleMode(split.output0(),0,0);
++        var r1=meter.sampleMode(split.output1(),0,0);
++        assertEquals(r0.observation().value(),r1.observation().value(),1e-15);
++        assertEquals(0.02*r0.apertureBudget().capturedFraction(),
++                r0.observation().value()+r1.observation().value(),1e-14);
++    }
++
++    @Test void movingDetectorSidewaysChangesTheReading() {
++        var meter=new IdealOpticalPowerMeter("meter",0.0003);
++        var centered=meter.sampleMode(input(),0,0);
++        var misaligned=meter.sampleMode(input(),0.0005,0);
++        assertTrue(centered.observation().value()>misaligned.observation().value());
++    }
++
++    @Test void freePropagationChangesFiniteApertureCollectionNotTotalPower() {
++        var mode=input();
++        var moved=mode.freeSpace(5);
++        var meter=new IdealOpticalPowerMeter("meter",0.0003);
++        var a=meter.sampleMode(mode,0,0);
++        var b=meter.sampleMode(moved,0,1);
++        assertEquals(mode.powerWatts(),moved.powerWatts(),1e-14);
++        assertTrue(a.observation().value()>b.observation().value());
++    }
++
++    @Test void faceAndModeMeasurementsAgreeAtCorrespondingGaussianPlane() {
++        var beam=new GaussianBeam(0.02,780e-9,0.0005,new Vec3(0,0,0),new Vec3(0,0,1));
++        double z=0.05;
++        var face=new IdealCircularDetectorFace(new Vec3(0.0001,0,z),new Vec3(0,0,-1),0.0003);
++        var plane=GaussianPlane.atAxialDistance(beam,z);
++        var mode=ParaxialModeField.fromPlane("laser", "port", plane,
++                new JonesVector(ComplexAmplitude.ONE,ComplexAmplitude.ZERO),0);
++        var meter=new IdealOpticalPowerMeter("meter",0.0003);
++        assertEquals(meter.sampleMode(mode,0.0001,0).observation().value(),
++                meter.sampleAtFace(beam,face,0).observation().value(),1e-14);
++    }
++
++    @Test void mismatchedDetectorFaceRadiusIsRejected() {
++        var beam=new GaussianBeam(0.02,780e-9,0.0005,new Vec3(0,0,0),new Vec3(0,0,1));
++        var face=new IdealCircularDetectorFace(new Vec3(0,0,0),new Vec3(0,0,-1),0.0004);
++        var meter=new IdealOpticalPowerMeter("meter",0.0005);
++        assertThrows(IllegalArgumentException.class,()->meter.sampleAtFace(beam,face,0));
++    }
++
++    @Test void invalidMeterAndTimeAndFieldAreRejected() {
++        assertThrows(IllegalArgumentException.class,()->new IdealOpticalPowerMeter("",0.01));
++        assertThrows(IllegalArgumentException.class,()->new IdealOpticalPowerMeter("x",0));
++        assertThrows(IllegalArgumentException.class,()->new IdealOpticalPowerMeter("x",Double.POSITIVE_INFINITY));
++        var meter=new IdealOpticalPowerMeter("meter",0.001);
++        assertThrows(IllegalArgumentException.class,()->meter.sampleMode(input(),0,-1));
++        assertThrows(IllegalArgumentException.class,()->meter.sampleMode(input(),-1,0));
++        assertThrows(IllegalArgumentException.class,()->meter.sampleMode(null,0,0));
++        assertThrows(IllegalArgumentException.class,()->meter.sampleAtFace(null,null,0));
++    }
++
++    @Test void idealPowerReadingHasNoServerOrModelApprovalAuthority() {
++        var reading=new IdealOpticalPowerMeter("fake-detector",0.001).sampleMode(input(),0,0);
++        assertEquals("ideal_collected_optical_power",reading.observation().observable());
++        assertFalse(reading.observation().observable().equals("OWNER_APPROVED"));
++    }
++}
+--- D8/physics-core/src/main/java/dev/coldatomcraft/physics/optics/GaussianCircularAperture.java
++++ D9/physics-core/src/main/java/dev/coldatomcraft/physics/optics/GaussianCircularAperture.java
+@@ -0,0 +1,182 @@
++package dev.coldatomcraft.physics.optics;
++
++/**
++ * Ideal, normally illuminated circular-aperture collection of a scalar TEM00
++ * Gaussian irradiance profile. No detector responsivity, absorption, time
++ * averaging, electronic readout or material model is implied.
++ *
++ * <p>The beam has a 1/e^2-intensity radius w at the aperture plane. A circular
++ * aperture of radius a is laterally displaced from the optical axis by d.
++ * All dimensions are in metres. The collected fraction is the integral of
++ * (2/(pi*w^2))*exp(-2*r^2/w^2) over the offset disk.</p>
++ *
++ * <p>For d=0 this reduces analytically to 1-exp(-2*a^2/w^2). Otherwise the
++ * implementation integrates the azimuthal fraction of concentric irradiance
++ * rings, using a fixed 96-point Gauss-Legendre quadrature with a sin^2 endpoint
++ * transform. It is a numerically tested reference, not a certified error-bound
++ * implementation for arbitrarily extreme floating-point geometries.</p>
++ */
++public final class GaussianCircularAperture {
++    private static final int QUADRATURE_POINTS = 96;
++    private static final double[] NODES = new double[QUADRATURE_POINTS];
++    private static final double[] WEIGHTS = new double[QUADRATURE_POINTS];
++    // At r/w=9, the omitted total Gaussian power is exp(-162), < 5e-71.
++    private static final double CUTOFF_RADII = 9.0;
++
++    static {
++        // Legendre roots/weights on [-1,1]. Arrays are private and immutable
++        // after initialization, so repeated measurement is deterministic.
++        int n = QUADRATURE_POINTS;
++        for (int i = 0; i < (n + 1) / 2; i++) {
++            double root = Math.cos(Math.PI * (i + 0.75) / (n + 0.5));
++            double derivative = 0;
++            boolean converged = false;
++            for (int iteration = 0; iteration < 32; iteration++) {
++                double previous = 1, beforePrevious = 0;
++                for (int k = 1; k <= n; k++) {
++                    double current = ((2 * k - 1) * root * previous
++                            - (k - 1) * beforePrevious) / k;
++                    beforePrevious = previous;
++                    previous = current;
++                }
++                derivative = n * (root * previous - beforePrevious)
++                        / (root * root - 1.0);
++                double next = root - previous / derivative;
++                if (Math.abs(next - root) <= 1e-15) {
++                    root = next;
++                    converged = true;
++                    break;
++                }
++                root = next;
++            }
++            if (!converged || !Double.isFinite(root)) {
++                throw new ExceptionInInitializerError("Gauss-Legendre roots did not converge");
++            }
++            // Recompute derivative at the final root for the quadrature weight.
++            double previous = 1, beforePrevious = 0;
++            for (int k = 1; k <= n; k++) {
++                double current = ((2 * k - 1) * root * previous
++                        - (k - 1) * beforePrevious) / k;
++                beforePrevious = previous;
++                previous = current;
++            }
++            derivative = n * (root * previous - beforePrevious)
++                    / (root * root - 1.0);
++            double weight = 2.0 / ((1.0 - root * root) * derivative * derivative);
++            NODES[i] = -root;
++            NODES[n - 1 - i] = root;
++            WEIGHTS[i] = weight;
++            WEIGHTS[n - 1 - i] = weight;
++        }
++    }
++
++    private GaussianCircularAperture() {}
++
++    public record Capture(double incidentPowerWatts,
++                          double capturedPowerWatts,
++                          double uncapturedPowerWatts,
++                          double spotRadiusMeters,
++                          double apertureRadiusMeters,
++                          double offsetMeters) {
++        public Capture {
++            if (!Double.isFinite(incidentPowerWatts) || incidentPowerWatts < 0
++                    || !Double.isFinite(capturedPowerWatts) || capturedPowerWatts < 0
++                    || !Double.isFinite(uncapturedPowerWatts) || uncapturedPowerWatts < 0
++                    || !Double.isFinite(spotRadiusMeters) || spotRadiusMeters <= 0
++                    || !Double.isFinite(apertureRadiusMeters) || apertureRadiusMeters < 0
++                    || !Double.isFinite(offsetMeters) || offsetMeters < 0) {
++                throw new IllegalArgumentException("invalid ideal aperture capture");
++            }
++            // Up to one ULP may be lost when P - captured rounds; do not
++            // silently assert that missed power represents material absorption.
++            double mismatch = Math.abs((capturedPowerWatts + uncapturedPowerWatts)
++                    - incidentPowerWatts);
++            if (mismatch > 4 * Math.ulp(incidentPowerWatts)) {
++                throw new IllegalArgumentException("optical power budget not conserved");
++            }
++        }
++
++        public double capturedFraction() {
++            return incidentPowerWatts == 0 ? 0 : capturedPowerWatts / incidentPowerWatts;
++        }
++    }
++
++    public static Capture capture(GaussianPlane plane, double apertureRadiusMeters,
++                                  double offsetMeters) {
++        if (plane == null) throw new IllegalArgumentException("Gaussian plane required");
++        return capture(plane.powerWatts(), plane.radiusMeters(),
++                apertureRadiusMeters, offsetMeters);
++    }
++
++    public static Capture capture(double incidentPowerWatts,
++                                  double spotRadiusMeters,
++                                  double apertureRadiusMeters,
++                                  double offsetMeters) {
++        if (!Double.isFinite(incidentPowerWatts) || incidentPowerWatts < 0) {
++            throw new IllegalArgumentException("incident power must be finite and nonnegative");
++        }
++        double fraction = capturedFraction(spotRadiusMeters, apertureRadiusMeters,
++                offsetMeters);
++        double captured = incidentPowerWatts * fraction;
++        if (!Double.isFinite(captured)) {
++            throw new ArithmeticException("captured power is not representable");
++        }
++        return new Capture(incidentPowerWatts, captured, incidentPowerWatts - captured,
++                spotRadiusMeters, apertureRadiusMeters, offsetMeters);
++    }
++
++    /** Fraction of ideal TEM00 power within an offset disk, dimensionless [0,1]. */
++    public static double capturedFraction(double spotRadiusMeters,
++                                          double apertureRadiusMeters,
++                                          double offsetMeters) {
++        if (!Double.isFinite(spotRadiusMeters) || spotRadiusMeters <= 0
++                || !Double.isFinite(apertureRadiusMeters) || apertureRadiusMeters < 0
++                || !Double.isFinite(offsetMeters) || offsetMeters < 0) {
++            throw new IllegalArgumentException("finite w>0, a>=0, d>=0 required");
++        }
++        double a = apertureRadiusMeters / spotRadiusMeters;
++        double d = offsetMeters / spotRadiusMeters;
++        if (!Double.isFinite(a) || !Double.isFinite(d)
++                || !Double.isFinite(a + d) || a + d > 1e150) {
++            throw new IllegalArgumentException("unrepresentable normalized aperture geometry");
++        }
++        if (a == 0) return 0;
++        if (d == 0) return -Math.expm1(-2.0 * a * a);
++        if (a - d >= CUTOFF_RADII) return 1.0;
++        if (d - a >= CUTOFF_RADII) return 0.0;
++        // In the tiny-geometry regime the disk's irradiance is constant to
++        // relative O((a+d)^2). Avoid the 0/0 risk in the angular fraction.
++        if (a + d < 1e-8) return 2.0 * a * a * Math.exp(-2.0 * d * d);
++
++        double interiorRadius = Math.max(0.0, a - d);
++        double interiorFraction = -Math.expm1(-2.0 * interiorRadius * interiorRadius);
++        double lower = Math.abs(a - d);
++        double upper = Math.min(CUTOFF_RADII, a + d);
++        if (upper <= lower) return interiorFraction;
++
++        // For each ring r/w=u, the angular fraction enclosed by the offset
++        // disk is acos((u^2 + d^2 - a^2)/(2*u*d))/pi. Integrate the radial
++        // power density 4*u*exp(-2*u^2). The sin^2 transform smooths the
++        // square-root endpoint behavior at internal tangencies.
++        double total = 0.0;
++        double width = upper - lower;
++        for (int i = 0; i < QUADRATURE_POINTS; i++) {
++            double t = (NODES[i] + 1.0) * (Math.PI / 4.0);
++            double s = Math.sin(t);
++            double c = Math.cos(t);
++            double u = lower + width * s * s;
++            double duDt = 2.0 * width * s * c;
++            // Factor d^2-a^2 so offset~radius retains precision.
++            double angularCosine = (u * u + (d - a) * (d + a)) / (2.0 * u * d);
++            double angle = Math.acos(Math.max(-1.0, Math.min(1.0, angularCosine)));
++            double integrand = (4.0 / Math.PI) * u * Math.exp(-2.0 * u * u)
++                    * angle * duDt;
++            total += WEIGHTS[i] * integrand;
++        }
++        double fraction = interiorFraction + (Math.PI / 4.0) * total;
++        if (!Double.isFinite(fraction) || fraction < -1e-13 || fraction > 1 + 1e-13) {
++            throw new ArithmeticException("aperture integral outside physical power bounds");
++        }
++        return Math.max(0.0, Math.min(1.0, fraction));
++    }
++}
+--- D8/physics-core/src/main/java/dev/coldatomcraft/physics/optics/IdealCircularDetectorFace.java
++++ D9/physics-core/src/main/java/dev/coldatomcraft/physics/optics/IdealCircularDetectorFace.java
+@@ -0,0 +1,56 @@
++package dev.coldatomcraft.physics.optics;
++
++import dev.coldatomcraft.physics.Vec3;
++
++/**
++ * Lab-local geometric reference plane for an ideal, front-illuminated power
++ * receiver. The face normal points TOWARD the arriving beam, so for a beam
++ * propagating along k the accepted orientation is n dot k = -1.
++ *
++ * <p>Only a detector perpendicular to one TEM00 Gaussian axis is supported.
++ * Oblique incidence, finite-angle diffraction, surface reflection, backside
++ * pickup, detector electrical response and beam occlusion are NOT modeled.</p>
++ */
++public record IdealCircularDetectorFace(Vec3 centerLabMeters,
++                                        Vec3 facingNormalLab,
++                                        double apertureRadiusMeters) {
++    public IdealCircularDetectorFace {
++        if (centerLabMeters == null || facingNormalLab == null
++                || !Double.isFinite(apertureRadiusMeters) || apertureRadiusMeters <= 0) {
++            throw new IllegalArgumentException("finite face position, normal and positive aperture radius required");
++        }
++        facingNormalLab = facingNormalLab.normalized();
++    }
++
++    /**
++     * Ideal cross-sectional power captured at the face. The waist may be
++     * upstream or downstream of this plane because waist != emitter port;
++     * source emission and obscuration must be checked by the future apparatus
++     * geometry layer. The analytic beam is not itself truncated by this probe.
++     */
++    public GaussianCircularAperture.Capture capture(GaussianBeam beam) {
++        if (beam == null) throw new IllegalArgumentException("beam required");
++        double alignment = facingNormalLab.dot(beam.directionLab());
++        if (Math.abs(alignment + 1.0) > 1e-12) {
++            throw new IllegalArgumentException("front-illuminated detector must be normal to the beam; oblique incidence unsupported");
++        }
++        Vec3 displacement = centerLabMeters.subtract(beam.waistPositionLabMeters());
++        double z = displacement.dot(beam.directionLab());
++        double spotRadius = beam.radiusMeters(z);
++        // Global Minecraft-scale doubles may have already erased a micron
++        // offset. Reject when one coordinate ULP exceeds a relevant spatial
++        // measurement scale, instead of reporting a fictitious centred hit.
++        double coordinateUlp = Math.max(
++                Math.max(Math.ulp(centerLabMeters.x()), Math.ulp(centerLabMeters.y())),
++                Math.max(Math.ulp(centerLabMeters.z()), Math.max(
++                        Math.max(Math.ulp(beam.waistPositionLabMeters().x()),
++                                Math.ulp(beam.waistPositionLabMeters().y())),
++                        Math.ulp(beam.waistPositionLabMeters().z()))));
++        if (coordinateUlp >= Math.min(spotRadius, apertureRadiusMeters)) {
++            throw new IllegalArgumentException("lab coordinate precision exceeds optical feature size; use a local origin");
++        }
++        double offset = displacement.subtract(beam.directionLab().scale(z)).magnitude();
++        return GaussianCircularAperture.capture(beam.powerWatts(),
++                spotRadius, apertureRadiusMeters, offset);
++    }
++}
+--- D8/physics-core/src/test/java/dev/coldatomcraft/physics/optics/GaussianCircularApertureTest.java
++++ D9/physics-core/src/test/java/dev/coldatomcraft/physics/optics/GaussianCircularApertureTest.java
+@@ -0,0 +1,96 @@
++package dev.coldatomcraft.physics.optics;
++
++import org.junit.jupiter.api.Test;
++import static org.junit.jupiter.api.Assertions.*;
++
++class GaussianCircularApertureTest {
++    @Test void centeredOneSpotRadiusUsesClosedFormIntegral() {
++        assertEquals(1-Math.exp(-2), GaussianCircularAperture.capturedFraction(0.001,0.001,0),1e-15);
++        assertEquals(1-Math.exp(-1), GaussianCircularAperture.capturedFraction(0.001,0.001/Math.sqrt(2),0),1e-15);
++    }
++
++    @Test void centeredApertureMatchesExistingGaussianPlaneReference() {
++        var plane = new GaussianPlane(0.02,780e-9,new GaussianQ(0.1,0.8));
++        double radius=plane.radiusMeters();
++        for(double fraction:new double[]{0.1,0.25,0.5,1,2,4}) {
++            var reading=GaussianCircularAperture.capture(plane,radius*fraction,0);
++            assertEquals(plane.powerWithinRadiusWatts(radius*fraction),reading.capturedPowerWatts(),1e-15);
++            assertEquals(plane.powerWatts(),reading.capturedPowerWatts()+reading.uncapturedPowerWatts(),1e-15);
++        }
++    }
++
++    @Test void displacedApertureHasCorrectNoncentralChiSquareReference() {
++        // Independent reference: noncentral chi-square CDF with 2 dof,
++        // noncentrality 4(d/w)^2 at threshold 4(a/w)^2.
++        assertEquals(0.2671201962031797,GaussianCircularAperture.capturedFraction(1,0.5,0.5),2e-11);
++    }
++
++    @Test void finiteOffsetMustReduceFixedAperturePower() {
++        double aligned=GaussianCircularAperture.capturedFraction(1,1,0);
++        double modest=GaussianCircularAperture.capturedFraction(1,1,0.5);
++        double farther=GaussianCircularAperture.capturedFraction(1,1,1.25);
++        assertTrue(aligned>modest);
++        assertTrue(modest>farther);
++        assertTrue(farther>0);
++    }
++
++    @Test void largerApertureCannotCollectLessPower() {
++        double previous=0;
++        for(double a:new double[]{0.05,0.1,0.3,0.8,1,1.5,3,6}) {
++            double current=GaussianCircularAperture.capturedFraction(1,a,0.7);
++            assertTrue(current>=previous-1e-13);
++            previous=current;
++        }
++    }
++
++    @Test void diskContainingEntireSignificantBeamReturnsOneWithinTailBound() {
++        assertEquals(1,GaussianCircularAperture.capturedFraction(1,20,2),0);
++        assertEquals(0,GaussianCircularAperture.capturedFraction(1,1,20),0);
++    }
++
++    @Test void concentricZeroRadiusHasZeroCapture() {
++        assertEquals(0,GaussianCircularAperture.capturedFraction(1,0,0),0);
++        assertEquals(0,GaussianCircularAperture.capturedFraction(1,0,1),0);
++    }
++
++    @Test void tinyOffsetAndTinyDiskAreNumericallyRepresentable() {
++        assertEquals(2e-20,GaussianCircularAperture.capturedFraction(1,1e-10,1e-10),1e-32);
++    }
++
++    @Test void nearTangentAperturesRetainNonzeroPowerAndNoOvercollection() {
++        for(double d:new double[]{5.999,6,6.001,9.999,10,10.001}) {
++            double value=GaussianCircularAperture.capturedFraction(1,10,d);
++            assertTrue(value>=0 && value<=1);
++        }
++    }
++
++    @Test void identicalScaledGeometriesHaveIdenticalFraction() {
++        double original=GaussianCircularAperture.capturedFraction(0.002,0.001,0.0012);
++        double rescaled=GaussianCircularAperture.capturedFraction(2,1,1.2);
++        assertEquals(original,rescaled,1e-14);
++    }
++
++    @Test void zeroIncidentPowerStaysZeroWithFiniteAperture() {
++        var result=GaussianCircularAperture.capture(0,0.001,0.002,0.0003);
++        assertEquals(0,result.capturedPowerWatts());
++        assertEquals(0,result.uncapturedPowerWatts());
++        assertEquals(0,result.capturedFraction());
++    }
++
++    @Test void budgetHasCapturedPlusUncapturedButNeverClaimsHeat() {
++        var result=GaussianCircularAperture.capture(1.5,0.001,0.0004,0.0001);
++        assertTrue(result.capturedPowerWatts()>0 && result.capturedPowerWatts()<1.5);
++        assertEquals(1.5,result.capturedPowerWatts()+result.uncapturedPowerWatts(),1e-14);
++    }
++
++    @Test void invalidParametersAreRejectedWithoutClamping() {
++        assertThrows(IllegalArgumentException.class,()->GaussianCircularAperture.capturedFraction(0,1,0));
++        assertThrows(IllegalArgumentException.class,()->GaussianCircularAperture.capturedFraction(-1,1,0));
++        assertThrows(IllegalArgumentException.class,()->GaussianCircularAperture.capturedFraction(1,-1,0));
++        assertThrows(IllegalArgumentException.class,()->GaussianCircularAperture.capturedFraction(1,1,-1));
++        assertThrows(IllegalArgumentException.class,()->GaussianCircularAperture.capturedFraction(1,1,Double.NaN));
++        assertThrows(IllegalArgumentException.class,()->GaussianCircularAperture.capturedFraction(Double.NaN,1,0));
++        assertThrows(IllegalArgumentException.class,()->GaussianCircularAperture.capture(-1,1,1,0));
++        assertThrows(IllegalArgumentException.class,()->GaussianCircularAperture.capturedFraction(1e-300,1e300,0));
++    }
++}
+--- D8/physics-core/src/test/java/dev/coldatomcraft/physics/optics/IdealCircularDetectorFaceTest.java
++++ D9/physics-core/src/test/java/dev/coldatomcraft/physics/optics/IdealCircularDetectorFaceTest.java
+@@ -0,0 +1,77 @@
++package dev.coldatomcraft.physics.optics;
++
++import dev.coldatomcraft.physics.Vec3;
++import org.junit.jupiter.api.Test;
++import static org.junit.jupiter.api.Assertions.*;
++
++class IdealCircularDetectorFaceTest {
++    private static GaussianBeam referenceBeam() {
++        return new GaussianBeam(0.02,780e-9,0.0005,
++                new Vec3(0,0,0),new Vec3(0,0,1));
++    }
++
++    @Test void centeredFaceCollectsPowerFromWaistRadius() {
++        var face=new IdealCircularDetectorFace(new Vec3(0,0,0),new Vec3(0,0,-4),0.0005);
++        var r=face.capture(referenceBeam());
++        assertEquals(0.02*(1-Math.exp(-2)),r.capturedPowerWatts(),1e-14);
++    }
++
++    @Test void farFieldDetectorSeesLargerSpotAndSmallerCapturedFraction() {
++        var waist=new IdealCircularDetectorFace(new Vec3(0,0,0),new Vec3(0,0,-1),0.0004);
++        var far=new IdealCircularDetectorFace(new Vec3(0,0,4.0),new Vec3(0,0,-1),0.0004);
++        assertTrue(waist.capture(referenceBeam()).capturedPowerWatts()>
++                far.capture(referenceBeam()).capturedPowerWatts());
++    }
++
++    @Test void decenteredFaceMustCaptureLessThanCentered() {
++        var centered=new IdealCircularDetectorFace(new Vec3(0,0,0.3),new Vec3(0,0,-1),0.0002);
++        var offset=new IdealCircularDetectorFace(new Vec3(0.0004,0,0.3),new Vec3(0,0,-1),0.0002);
++        assertTrue(centered.capture(referenceBeam()).capturedPowerWatts()>
++                offset.capture(referenceBeam()).capturedPowerWatts());
++    }
++
++    @Test void laboratoryTranslationDoesNotChangeRelativeCapture() {
++        var origin=new Vec3(2.0,-3.0,1.5);
++        var beam=new GaussianBeam(0.02,780e-9,0.0005,origin,new Vec3(0,0,1));
++        var face=new IdealCircularDetectorFace(origin.add(new Vec3(0.0002,0,0.1)),
++                new Vec3(0,0,-1),0.0005);
++        var baseline=new IdealCircularDetectorFace(new Vec3(0.0002,0,0.1),
++                new Vec3(0,0,-1),0.0005);
++        assertEquals(baseline.capture(referenceBeam()).capturedPowerWatts(),
++                face.capture(beam).capturedPowerWatts(),1e-12);
++    }
++
++    @Test void rotatedLaboratoryAxesProduceSamePower() {
++        var beam=new GaussianBeam(0.02,780e-9,0.0005,
++                new Vec3(0,0,0),new Vec3(1,0,0));
++        var face=new IdealCircularDetectorFace(new Vec3(0.1,0.0004,0),new Vec3(-1,0,0),0.0002);
++        var equivalent=new IdealCircularDetectorFace(new Vec3(0,0.0004,0.1),new Vec3(0,0,-1),0.0002);
++        assertEquals(equivalent.capture(referenceBeam()).capturedPowerWatts(),
++                face.capture(beam).capturedPowerWatts(),1e-13);
++    }
++
++    @Test void backFacingDetectorCannotSilentlyReportIncidentPower() {
++        var face=new IdealCircularDetectorFace(new Vec3(0,0,0.1),new Vec3(0,0,1),0.0005);
++        assertThrows(IllegalArgumentException.class,()->face.capture(referenceBeam()));
++    }
++
++    @Test void obliqueFaceMustBeRejectedInsteadOfUsingNormalIncidenceFormula() {
++        var face=new IdealCircularDetectorFace(new Vec3(0,0,0.1),new Vec3(0.3,0,-1),0.0005);
++        assertThrows(IllegalArgumentException.class,()->face.capture(referenceBeam()));
++    }
++
++    @Test void oversizedGlobalCoordinatesAreRejectedInsteadOfSilentlyLosingMicronOffsets() {
++        var beam=new GaussianBeam(0.02,780e-9,0.0005,
++                new Vec3(1e16,0,0),new Vec3(0,0,1));
++        var face=new IdealCircularDetectorFace(new Vec3(1e16,0,0.1),
++                new Vec3(0,0,-1),0.0005);
++        assertThrows(IllegalArgumentException.class,()->face.capture(beam));
++    }
++
++    @Test void physicalFaceInputValidation() {
++        assertThrows(IllegalArgumentException.class,()->new IdealCircularDetectorFace(new Vec3(0,0,0),new Vec3(0,0,0),1));
++        assertThrows(IllegalArgumentException.class,()->new IdealCircularDetectorFace(null,new Vec3(0,0,-1),1));
++        assertThrows(IllegalArgumentException.class,()->new IdealCircularDetectorFace(new Vec3(0,0,0),new Vec3(0,0,-1),0));
++        assertThrows(IllegalArgumentException.class,()->new IdealCircularDetectorFace(new Vec3(0,0,0),new Vec3(0,0,-1),Double.NaN));
++    }
++}
+--- D8/tools/verify-core.ps1
++++ D9/tools/verify-core.ps1
+@@ -10,6 +10,8 @@
+         Join-Path $root 'verification/OpticsSmoke.java'
+         Join-Path $root 'verification/CoherentSmoke.java'
+         Join-Path $root 'verification/OpticalPathSmoke.java'
++        Join-Path $root 'verification/GeometryOpticsSmoke.java'
++        Join-Path $root 'verification/PowerMeterSmoke.java'
+     )
+     & javac --release 25 -encoding UTF-8 -d $tmp @sourcePaths
+     if ($LASTEXITCODE -ne 0) { throw 'javac failed' }
+@@ -21,6 +23,10 @@
+     if ($LASTEXITCODE -ne 0) { throw 'coherent optics smoke failed' }
+     & java -cp $tmp dev.coldatomcraft.verification.OpticalPathSmoke
+     if ($LASTEXITCODE -ne 0) { throw 'optical-path smoke failed' }
++    & java -cp $tmp dev.coldatomcraft.verification.GeometryOpticsSmoke
++    if ($LASTEXITCODE -ne 0) { throw 'geometry optics smoke failed' }
++    & java -cp $tmp dev.coldatomcraft.verification.PowerMeterSmoke
++    if ($LASTEXITCODE -ne 0) { throw 'optical power smoke failed' }
+ } finally {
+     Remove-Item $tmp -Force -Recurse -ErrorAction SilentlyContinue
+ }
+--- D8/tools/verify-core.sh
++++ D9/tools/verify-core.sh
+@@ -5,7 +5,8 @@
+ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
+ find "$ROOT/physics-core/src/main/java" "$ROOT/experiment-core/src/main/java" -name '*.java' -print > "$TMP/sources.txt"
+ printf '%s\n' "$ROOT/verification/Smoke.java" "$ROOT/verification/OpticsSmoke.java" \
+-  "$ROOT/verification/CoherentSmoke.java" "$ROOT/verification/OpticalPathSmoke.java" >> "$TMP/sources.txt"
++  "$ROOT/verification/CoherentSmoke.java" "$ROOT/verification/OpticalPathSmoke.java" \
++  "$ROOT/verification/GeometryOpticsSmoke.java" "$ROOT/verification/PowerMeterSmoke.java" >> "$TMP/sources.txt"
+ mkdir -p "$TMP/classes"
+ javac --release 25 -encoding UTF-8 -d "$TMP/classes" @"$TMP/sources.txt"
+ java -cp "$TMP/classes" dev.coldatomcraft.verification.Smoke
+@@ -13,3 +14,6 @@
+ java -cp "$TMP/classes" dev.coldatomcraft.verification.OpticsSmoke
+ java -cp "$TMP/classes" dev.coldatomcraft.verification.CoherentSmoke
+ java -cp "$TMP/classes" dev.coldatomcraft.verification.OpticalPathSmoke
++
++java -cp "$TMP/classes" dev.coldatomcraft.verification.GeometryOpticsSmoke
++java -cp "$TMP/classes" dev.coldatomcraft.verification.PowerMeterSmoke
+--- D8/tools/verify_m0.py
++++ D9/tools/verify_m0.py
+@@ -23,7 +23,7 @@
+ 
+ from inspect_mod_jar import inspect
+ 
+-MINIMUM_JUNIT_TEST_COUNT = 255  # D7 baseline 224 + D8 31 @Test methods
++MINIMUM_JUNIT_TEST_COUNT = 287  # D8 baseline 255 + D9 32 @Test methods
+ GRADLE_TASKS = (
+     "clean", ":physics-core:test", ":experiment-core:test",
+     ":neoforge-mod:build", ":neoforge-mod:verifyDistributableJar",
+@@ -98,7 +98,7 @@
+         source_root=str(root),
+         timestamp_utc=stamp,
+         os=platform.platform(),
+-        scope="M0-D8 source build/JUnit/JAR content only; NOT game startup or Owner signoff",
++        scope="M0-D9 source build/JUnit/JAR content only; NOT game startup or Owner signoff",
+         checks={},
+         actual_installed_jar_runtime="NOT RUN",
+         minecraft_client_runtime="NOT RUN",
+@@ -149,6 +149,7 @@
+             ("coherent-high-precision-oracle", [sys.executable, "verification/M0-R2.1-D6/verify_coherent_reference.py"]),
+             ("optical-path-high-precision-oracle", [sys.executable, "verification/M0-R2.1-D7/verify_optical_path_reference.py"]),
+             ("fresnel-high-precision-oracle", [sys.executable, "verification/M0-R2.1-D8/verify_fresnel_reference.py"]),
++            ("aperture-high-precision-oracle", [sys.executable, "verification/M0-R2.1-D9/verify_detector_reference.py"]),
+             ("python-tests", [sys.executable, "-m", "unittest", "discover",
+                               "-s", "verification", "-p", "test_*.py", "-v"]),
+             ("asset-schema", [sys.executable, "tools/validate_assets.py",
+--- D8/verification/M0-R2.1-D9/DetectorReferenceProbe.java
++++ D9/verification/M0-R2.1-D9/DetectorReferenceProbe.java
+@@ -0,0 +1,24 @@
++package dev.coldatomcraft.verification;
++
++import dev.coldatomcraft.physics.optics.GaussianCircularAperture;
++
++/** Numerical output only; independent Python oracle owns the expected answers. */
++public final class DetectorReferenceProbe {
++    private DetectorReferenceProbe() {}
++    public static void main(String[] args) {
++        double[][] cases = {
++                {0.1, 0}, {0.1, 0.1}, {0.2, 0.5}, {0.4, 0.1},
++                {0.5, 0.5}, {0.5, 1}, {1, 0}, {1, 0.2},
++                {1, 0.9}, {1, 0.99}, {1, 1}, {1, 1.001},
++                {1, 1.5}, {2, 0.5}, {2, 2}, {3, 3},
++                {6, 5.94}, {6, 6}, {6, 6.00006},
++                {10, 9.9}, {10, 10}, {10, 10.0001},
++                {0.01, 0.01}, {0.001, 0.001}, {8, 1}, {1, 8}
++        };
++        for (double[] point : cases) {
++            double fraction=GaussianCircularAperture.capturedFraction(1,point[0],point[1]);
++            System.out.printf(java.util.Locale.ROOT,"CASE|%.17g|%.17g|%.17g%n",
++                    point[0],point[1],fraction);
++        }
++    }
++}
+--- D8/verification/M0-R2.1-D9/PowerMeterBenchmark.java
++++ D9/verification/M0-R2.1-D9/PowerMeterBenchmark.java
+@@ -0,0 +1,33 @@
++package dev.coldatomcraft.verification;
++
++import dev.coldatomcraft.physics.optics.GaussianCircularAperture;
++
++/** No JMH, no real Minecraft TPS claim; deterministic exploratory micro-benchmark. */
++public final class PowerMeterBenchmark {
++    private static volatile double sink;
++    private PowerMeterBenchmark() {}
++
++    public static void main(String[] ignored) {
++        final int warmup = 30_000;
++        final int count = 100_000;
++        for (int j = 0; j < warmup; j++) {
++            sink = GaussianCircularAperture.capturedFraction(1, 0.7,
++                    0.1 + (j % 37) * 0.01);
++        }
++        long t0 = System.nanoTime();
++        double sum = 0;
++        for (int j=0; j<count; j++) {
++            sum+=GaussianCircularAperture.capturedFraction(1,0.7,0);
++        }
++        long t1 = System.nanoTime();
++        for (int j=0; j<count; j++) {
++            sum+=GaussianCircularAperture.capturedFraction(1,0.7,
++                    0.1+(j%37)*0.01);
++        }
++        long t2 = System.nanoTime();
++        sink=sum;
++        System.out.printf(java.util.Locale.ROOT,
++                "D9 exploratory JDK21 measurement (not JMH/TPS): centered=%d ns/op, offset=%d ns/op, sum=%.9g%n",
++                (t1-t0)/count,(t2-t1)/count,sink);
++    }
++}
+--- D8/verification/M0-R2.1-D9/README.md
++++ D9/verification/M0-R2.1-D9/README.md
+@@ -0,0 +1,29 @@
++# D9 reproducible verification
++
++Input: frozen CAC-M0-R2.1-D8 (313/313 SHA-256, archive CRC clean).
++
++## Local checks without Gradle
++
++    sh verification/M0-R2.1-D9/run_d9_offline.sh
++    sh verification/M0-R2.1-D3/run_local_offline.sh
++
++`run_d9_offline.sh` re-runs the D5–D8 scientific oracles, plus the new D9
++standalone smoke and independent Decimal80 Poisson/Gamma aperture oracle.
++`run_local_offline.sh` compiles all available physics-core and experiment-core
++JUnit SOURCE test methods with a local assertion shim. It is explicitly
++**not JUnit Platform/Jupiter** and must never be counted as formal JUnit.
++
++Both checks can run on JDK21 for compatibility evidence. The actual game
++requires JDK25 plus configured NeoForge dependencies.
++
++## Formal toolchain on a prepared JDK25 host
++
++    python tools/verify_m0.py
++
++The runner demands all JUnit XML suites, at least 287 formal tests and the
++actual distributable JAR class contents. It does not launch the game.
++D9's client/server and installed-JAR runtime gates remain NOT RUN until
++there is direct run evidence from this exact D9 source.
++
++Do not confuse a virtual optical readout with a calibrated device or a
++world-mutation authorization.
+--- D8/verification/M0-R2.1-D9/optional_scipy_stress.py
++++ D9/verification/M0-R2.1-D9/optional_scipy_stress.py
+@@ -0,0 +1,55 @@
++#!/usr/bin/env python3
++"""OPTIONAL secondary oracle requiring scipy (not a project dependency).
++
++Compares 1500 deterministic aperture offsets against scipy.stats.ncx2.cdf.
++For the mandatory dependency-free 80-digit independent oracle, use
++verify_detector_reference.py instead.
++"""
++from pathlib import Path
++import random
++import subprocess
++import tempfile
++
++try:
++    from scipy.stats import ncx2
++except ImportError as exc:
++    raise SystemExit('NOT RUN: optional scipy missing') from exc
++
++ROOT=Path(__file__).resolve().parents[2]
++BASE=Path(__file__).parent
++random.seed(20261027)
++pairs=[]
++for _ in range(1500):
++    a=10**random.uniform(-2,1.7)
++    d=(10**random.uniform(-2,1.7)) if random.random()<0.5 else a*(1+random.uniform(-1e-3,1e-3))
++    pairs.append((a,d))
++
++with tempfile.TemporaryDirectory(prefix='cac-d9-scipy-') as tmp:
++    src=Path(tmp)/'DetectorSweep.java'
++    src.write_text('''import dev.coldatomcraft.physics.optics.GaussianCircularAperture;
++import java.util.Scanner;
++public final class DetectorSweep {
++ public static void main(String[] args) {
++  try(var input=new Scanner(System.in)) {
++   input.useLocale(java.util.Locale.ROOT);
++   while (input.hasNextDouble()) {
++    double a=input.nextDouble(), d=input.nextDouble();
++    System.out.printf(java.util.Locale.ROOT,"%.17g%n",GaussianCircularAperture.capturedFraction(1,a,d));
++   }
++  }
++ }
++}''',encoding='utf-8')
++    sources=sorted(str(x) for x in (ROOT/'physics-core/src/main/java').rglob('*.java'))
++    subprocess.run(['javac','--release','21','-encoding','UTF-8','-d',tmp,*sources,str(src)],check=True)
++    output=subprocess.run(['java','-cp',tmp,'DetectorSweep'],
++           input=''.join(f'{a:.17g} {d:.17g}\n' for a,d in pairs),
++           capture_output=True,text=True,check=True).stdout
++    vals=[float(x) for x in output.splitlines()]
++    assert len(vals)==len(pairs)
++    worst=(0,None)
++    for (a,d),fraction in zip(pairs,vals):
++        reference=ncx2.cdf(4*a*a,2,4*d*d)
++        error=abs(reference-fraction)
++        if error>worst[0]:worst=(error,(a,d,reference,fraction))
++    print(f'OPTIONAL SciPy secondary stress: {len(pairs)} pairs; maximum abs error {worst[0]:.6g}; case {worst[1]}')
++    assert worst[0]<3e-11
+--- D8/verification/M0-R2.1-D9/run_d9_offline.sh
++++ D9/verification/M0-R2.1-D9/run_d9_offline.sh
+@@ -0,0 +1,15 @@
++#!/usr/bin/env sh
++# D9 local scientific checks. NOT Gradle/JUnit Platform or game runtime.
++set -eu
++ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
++sh "$ROOT/verification/M0-R2.1-D8/run_d8_offline.sh"
++TMP=$(mktemp -d)
++trap 'rm -rf "$TMP"' EXIT HUP INT TERM
++find "$ROOT/physics-core/src/main/java" "$ROOT/experiment-core/src/main/java" \
++  -name '*.java' -print > "$TMP/sources.txt"
++printf '%s\n' "$ROOT/verification/PowerMeterSmoke.java" >> "$TMP/sources.txt"
++mkdir -p "$TMP/classes"
++javac --release 21 -encoding UTF-8 -Xlint:all -Werror -d "$TMP/classes" @"$TMP/sources.txt"
++java -cp "$TMP/classes" dev.coldatomcraft.verification.PowerMeterSmoke
++python3 "$ROOT/verification/M0-R2.1-D9/verify_detector_reference.py"
++echo 'NOTICE: this scientific reference run is not official JDK25/Gradle/JUnit or NeoForge runtime.'
+--- D8/verification/M0-R2.1-D9/verify_detector_reference.py
++++ D9/verification/M0-R2.1-D9/verify_detector_reference.py
+@@ -0,0 +1,75 @@
++#!/usr/bin/env python3
++"""Independent pure-stdlib Decimal(80) reference for offset-Gaussian apertures.
++
++Java uses transformed angular integration and Gauss-Legendre nodes.
++This independently computes the noncentral-chi-square CDF using a
++Poisson/Gamma mixture (2 degrees of freedom). Not JUnit/NeoForge.
++"""
++
++from decimal import Decimal, localcontext
++from pathlib import Path
++import subprocess
++import tempfile
++
++ROOT = Path(__file__).resolve().parents[2]
++D = Decimal
++
++
++def independent_fraction(a: Decimal, d: Decimal) -> Decimal:
++    if a < 0 or d < 0:
++        raise ValueError("nonnegative normalized dimensions required")
++    # Noncentrality lambda=4*d^2 and threshold x=4*a^2.
++    # s=lambda/2=2*d^2, t=x/2=2*a^2.
++    s, t = 2*d*d, 2*a*a
++    poisson_s = (-s).exp()
++    poisson_t = (-t).exp()
++    cumulative_t = poisson_t
++    result = D(0)
++    # Integral = sum_k Poisson(s,k) * GammaCDF(k+1,t),
++    # where GammaCDF(k+1,t) = 1 - PoissonCDF(t,k).
++    max_iterations = max(400, int(max(s,t))+500)
++    for k in range(max_iterations):
++        tail_t = 1 - cumulative_t
++        if tail_t < 0 and abs(tail_t) < D("1e-72"):
++            tail_t = D(0)
++        result += poisson_s * tail_t
++        kp1 = k+1
++        poisson_s *= s / kp1
++        poisson_t *= t / kp1
++        cumulative_t += poisson_t
++        if kp1 > s+100 and poisson_s < D("1e-75"):
++            break
++    else:
++        raise AssertionError("Poisson/Gamma decimal series did not converge")
++    return result
++
++
++def main():
++    sources=sorted(str(x) for x in (ROOT/'physics-core/src/main/java').rglob('*.java'))
++    probe=ROOT/'verification/M0-R2.1-D9/DetectorReferenceProbe.java'
++    with tempfile.TemporaryDirectory(prefix='cac-d9-optical-power-') as output:
++        subprocess.run(['javac','--release','21','-encoding','UTF-8',
++                        '-Xlint:all','-Werror','-d',output,*sources,str(probe)],check=True)
++        results=subprocess.check_output(['java','-cp',output,
++                       'dev.coldatomcraft.verification.DetectorReferenceProbe'],text=True)
++    comparisons=0
++    with localcontext() as ctx:
++        ctx.prec=80
++        for line in results.splitlines():
++            fields=line.split('|')
++            if len(fields)!=4 or fields[0]!='CASE':
++                raise AssertionError('malformed Java detector oracle row: '+line)
++            a,d,observed = map(D,fields[1:])
++            target=independent_fraction(a,d)
++            error=abs(observed-target)
++            if error>D('3e-11'):
++                raise AssertionError(f'offset disk a/w={a}, d/w={d}: Java={observed}, '
++                                     f'Decimal80={target}, error={error}')
++            comparisons+=1
++    assert comparisons == 26, comparisons
++    print(f'PASS: {comparisons}/{comparisons} independent Decimal80 offset Gaussian '
++          'aperture power checks (noncentral chi-square / Poisson-Gamma oracle); NOT JUnit')
++
++
++if __name__=='__main__':
++    main()
+--- D8/verification/PowerMeterSmoke.java
++++ D9/verification/PowerMeterSmoke.java
+@@ -0,0 +1,68 @@
++package dev.coldatomcraft.verification;
++
++import dev.coldatomcraft.experiment.IdealOpticalPowerMeter;
++import dev.coldatomcraft.physics.Vec3;
++import dev.coldatomcraft.physics.optics.*;
++
++/** Standalone scientific smoke, not JUnit or Minecraft runtime. */
++public final class PowerMeterSmoke {
++    private static int checks;
++    private PowerMeterSmoke() {}
++
++    private static void check(boolean condition,String message) {
++        checks++;
++        if (!condition) throw new AssertionError(message);
++    }
++    private static void close(double expected,double actual,double abs,String message) {
++        checks++;
++        if (!Double.isFinite(actual)||Math.abs(expected-actual)>abs)
++            throw new AssertionError(message+": expected="+expected+" actual="+actual);
++    }
++
++    public static void main(String[] args) {
++        double power = 0.02, w0 = 0.0005, lambda=780e-9;
++        var beam=new GaussianBeam(power,lambda,w0,new Vec3(0,0,0),new Vec3(0,0,1));
++        var waist=GaussianPlane.atAxialDistance(beam,0);
++        close(1-Math.exp(-2),GaussianCircularAperture.capturedFraction(w0,w0,0),1e-14,"centered disk");
++        var matched=GaussianCircularAperture.capture(waist,w0,0);
++        close(power*(1-Math.exp(-2)),matched.capturedPowerWatts(),1e-14,"captured watts");
++        close(power,matched.capturedPowerWatts()+matched.uncapturedPowerWatts(),1e-14,"budget");
++        var offset=GaussianCircularAperture.capture(waist,w0,w0);
++        check(offset.capturedPowerWatts()<matched.capturedPowerWatts(),"misalignment");
++        var far=new IdealCircularDetectorFace(new Vec3(0,0,4),new Vec3(0,0,-1),w0);
++        check(far.capture(beam).capturedPowerWatts()<matched.capturedPowerWatts(),"diffractive widening");
++        var face=new IdealCircularDetectorFace(new Vec3(0,0,0),new Vec3(0,0,-1),w0);
++        close(matched.capturedPowerWatts(),face.capture(beam).capturedPowerWatts(),1e-14,"3D face");
++        var meter=new IdealOpticalPowerMeter("D9-meter",w0);
++        var mode=ParaxialModeField.fromPlane("phase-reference","port-frame",waist,
++                new JonesVector(ComplexAmplitude.ONE,ComplexAmplitude.ZERO),0);
++        var reading=meter.sampleMode(mode,0,123);
++        close(matched.capturedPowerWatts(),reading.observation().value(),1e-14,"mode readout");
++        check("W".equals(reading.observation().siUnit()),"SI units");
++        check("ideal_collected_optical_power".equals(reading.observation().observable()),"explicit ideal observable");
++        check(reading.observation().simulatedTimeNanos()==123,"measurement timestamp");
++        close(power,mode.powerWatts(),1e-14,"noninvasive probe");
++        close(reading.observation().value(),meter.sampleAtFace(beam,face,0).observation().value(),
++                1e-14,"mode and geometry readout");
++        var splitter=new IdealTwoPortBeamSplitter(0.5);
++        var arms=splitter.split(mode);
++        var out=splitter.scatter(arms.output0(),arms.output1());
++        var a=meter.sampleMode(out.output0(),0,0);
++        var b=meter.sampleMode(out.output1(),0,0);
++        close(reading.observation().value(),a.observation().value()+b.observation().value(),
++                1e-13,"MZI power budgets");
++        check(a.observation().value()<b.observation().value(),"MZI dark/bright ports");
++        var phaseOut=splitter.scatter(arms.output0(),arms.output1().withUniformPhaseRadians(Math.PI));
++        check(meter.sampleMode(phaseOut.output0(),0,0).observation().value()>
++                meter.sampleMode(phaseOut.output1(),0,0).observation().value(),"MZI phase reversal");
++        try {
++            new IdealCircularDetectorFace(new Vec3(0,0,1),new Vec3(0,0,1),w0).capture(beam);
++            throw new AssertionError("backside detector accepted");
++        } catch (IllegalArgumentException expected) { checks++; }
++        try {
++            meter.sampleMode(mode,Double.NaN,0);
++            throw new AssertionError("nonfinite offset accepted");
++        } catch (IllegalArgumentException expected) { checks++; }
++        System.out.printf("PASS: %d/%d standalone D9 optical power checks; NOT JUnit%n",checks,checks);
++    }
++}

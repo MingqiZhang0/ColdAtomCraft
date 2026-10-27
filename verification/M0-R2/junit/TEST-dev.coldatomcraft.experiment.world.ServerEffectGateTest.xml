@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="dev.coldatomcraft.experiment.world.ServerEffectGateTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-26T06:46:49.127Z" hostname="DESKTOP-A4M7O81" time="0.017">
+  <properties/>
+  <testcase name="worldEffectGateHasNoMutationApi()" classname="dev.coldatomcraft.experiment.world.ServerEffectGateTest" time="0.002"/>
+  <testcase name="rejectedPrecheckCannotBeAuthorizedByServerFacts()" classname="dev.coldatomcraft.experiment.world.ServerEffectGateTest" time="0.012"/>
+  <testcase name="allLiveServerFactsAreRequired()" classname="dev.coldatomcraft.experiment.world.ServerEffectGateTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
