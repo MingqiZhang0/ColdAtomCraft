@@ -34,8 +34,8 @@ public final class DiagnosticLaserBlock extends Block {
 
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext context) {
-        // Laser output points in the same horizontal direction the player is facing.
-        return defaultBlockState().setValue(FACING, context.getHorizontalDirection());
+        // Laser output points toward the placing player (same convention as the power meter).
+        return defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite());
     }
 
     @Override
