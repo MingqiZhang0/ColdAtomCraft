@@ -33,6 +33,10 @@ final class DiagnosticBeamScan {
                         : PreviewBeamRoute.Cell.EMITTER_OFF;
             }
             return state.isAir() ? PreviewBeamRoute.Cell.AIR : PreviewBeamRoute.Cell.OBSTACLE;
+        }, distance -> {
+            BlockPos next = receiverPos.relative(receiverFront, distance);
+            return level.getBlockEntity(next) instanceof LaserSettingsBlockEntity source
+                    ? source.tuning() : null;
         });
         return switch (result.status()) {
             case MEASURED -> Component.translatable("message.coldatomcraft.preview.reading",
@@ -43,6 +47,7 @@ final class DiagnosticBeamScan {
             case UNLOADED -> Component.translatable("message.coldatomcraft.preview.unloaded");
             case WRONG_FACING -> Component.translatable("message.coldatomcraft.preview.wrong_facing");
             case SHUTTER_CLOSED -> Component.translatable("message.coldatomcraft.preview.shutter_closed");
+            case SOURCE_CONFIG_MISSING -> Component.translatable("message.coldatomcraft.preview.config_missing");
         };
     }
 }

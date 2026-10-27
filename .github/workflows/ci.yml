@@ -43,6 +43,8 @@ jobs:
           python verification/M0-R2.1-D8/verify_fresnel_reference.py
           python verification/M0-R2.1-D9/verify_detector_reference.py
           bash verification/D10-placeholder/run_preview_offline.sh
+          bash verification/D12-laser-gui/run_d12_offline.sh
+          bash verification/D11-visible-beam/run_visual_offline.sh
           python tools/test_preview_assets.py
           python -m unittest discover -s verification -p 'test_*.py' -v
           python tools/validate_assets.py assets/manifests/laser_source.example.json
@@ -93,7 +95,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: CAC-M0-R2.1-D10-preview-junit-reports
+          name: CAC-M0-R2.1-D12-laser-control-junit-reports
           path: |
             physics-core/build/test-results/test/*.xml
             experiment-core/build/test-results/test/*.xml
@@ -103,6 +105,6 @@ jobs:
       - name: Upload NeoForge JAR
         uses: actions/upload-artifact@v4
         with:
-          name: CAC-M0-R2.1-D10-preview-neoforge
+          name: CAC-M0-R2.1-D12-laser-control-neoforge
           path: neoforge-mod/build/libs/*.jar
           retention-days: 14

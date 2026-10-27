@@ -45,6 +45,13 @@ public final class PreviewOpticalBench {
      */
     public static IdealOpticalPowerMeter.Reading sampleAligned(
             int separationBlocks, int aperturePresetIndex) {
+        return sampleAligned(separationBlocks, aperturePresetIndex, LaserTuning.DEFAULT);
+    }
+
+    /** Resolve this exact source's saved settings, never the global demo constants. */
+    public static IdealOpticalPowerMeter.Reading sampleAligned(
+            int separationBlocks, int aperturePresetIndex, LaserTuning tuning) {
+        if (tuning == null) throw new IllegalArgumentException("source tuning required");
         if (separationBlocks < 1 || separationBlocks > MAX_SEPARATION_BLOCKS) {
             throw new IllegalArgumentException("preview source/detector separation must be 1..24 blocks");
         }
@@ -53,9 +60,7 @@ public final class PreviewOpticalBench {
             throw new IllegalArgumentException("nonpositive optical port separation");
         }
         double aperture = apertureRadiusMeters(aperturePresetIndex);
-        GaussianBeam beam = new GaussianBeam(DEMO_POWER_WATTS,
-                DEMO_WAVELENGTH_METERS, DEMO_WAIST_RADIUS_METERS,
-                new Vec3(0, 0, 0), new Vec3(0, 0, 1));
+        GaussianBeam beam = tuning.laboratoryBeam();
         IdealCircularDetectorFace face = new IdealCircularDetectorFace(
                 new Vec3(0, 0, faceSeparationMeters), new Vec3(0, 0, -1), aperture);
         return new IdealOpticalPowerMeter("coldatomcraft:preview_power_meter", aperture)

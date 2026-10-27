@@ -23,7 +23,7 @@ import xml.etree.ElementTree as ET
 
 from inspect_mod_jar import inspect
 
-MINIMUM_JUNIT_TEST_COUNT = 307  # D9 baseline 287 + D10 20 @Test methods
+MINIMUM_JUNIT_TEST_COUNT = 319  # D10 baseline 307 + D12 12 new JUnit methods (D11 additional tests allowed)
 GRADLE_TASKS = (
     "clean", ":physics-core:test", ":experiment-core:test",
     ":neoforge-mod:build", ":neoforge-mod:verifyDistributableJar",
@@ -98,7 +98,7 @@ def main(argv: list[str] | None = None) -> int:
         source_root=str(root),
         timestamp_utc=stamp,
         os=platform.platform(),
-        scope="D10 preview source build/JUnit/JAR content only; NOT game startup or Owner signoff",
+        scope="D12 device-specific laser GUI/build/JUnit/JAR verification only; NOT game startup or Owner scientific approval",
         checks={},
         actual_installed_jar_runtime="NOT RUN",
         minecraft_client_runtime="NOT RUN",
@@ -150,6 +150,7 @@ def main(argv: list[str] | None = None) -> int:
             ("optical-path-high-precision-oracle", [sys.executable, "verification/M0-R2.1-D7/verify_optical_path_reference.py"]),
             ("fresnel-high-precision-oracle", [sys.executable, "verification/M0-R2.1-D8/verify_fresnel_reference.py"]),
             ("aperture-high-precision-oracle", [sys.executable, "verification/M0-R2.1-D9/verify_detector_reference.py"]),
+            ("preview-beam-geometry", [sys.executable, "tools/check_beam_visual.py"]),
             ("preview-asset-tests", [sys.executable, "tools/test_preview_assets.py"]),
             ("python-tests", [sys.executable, "-m", "unittest", "discover",
                               "-s", "verification", "-p", "test_*.py", "-v"]),

@@ -1,3 +1,33 @@
+# CAC D12 — Laser parameter UI and per-device settings (development preview)
+
+**Status: SOURCE CHECKPOINT — NeoForge 26.3 JDK25/CI compilation and in-game UI remain unverified.**
+
+D12 builds on D11's Gaussian-particle beam. **Right-click the diagnostic laser to open
+its parameter screen** instead of toggling it. The panel contains an ON/OFF
+button, left/right rotation, and sliders for output power (1–200 mW), vacuum
+wavelength (400–1100 nm), waist radius (0.10–3.00 mm), and waist longitudinal
+position (−2.00 to +2.00 m from the output port).
+
+Settings are individually stored in a `LaserSettingsBlockEntity` and saved to
+the world. The vanilla container button channel authorizes server changes;
+finite data slots mirror values to the client. The D10 ideal power meter and the
+D11 false-colour Gaussian beam use the *same* per-device `LaserTuning`.
+Controls do not invent absorption, heating, radiation damage, automatic cold
+atom cooling, or manufacturing characteristics. The 24-block straight-path
+cap is an instrument PREVIEW limitation, not a propagation law.
+
+**This ZIP includes D11 + D12** because the user's GitHub `main` had D10 at
+package preparation. Use the embedded one-file PowerShell installer for GitHub
+upload, or import the whole source directory in a clean repository.
+
+For testing and operating instructions: [D12 GUI guide](docs/D12_LASER_GUI.md).
+For the independent Java reference smoke: `bash verification/D12-laser-gui/run_d12_offline.sh`.
+On JDK25/NeoForge: `python tools/verify_m0.py`, then playtest the JAR after CI
+success. This environment has JDK21 only: do not treat offline tests as formal
+NeoForge or runtime proof.
+
+---
+
 # CAC-M0-R2.1-D10 — Placeholder interactive apparatus (DEV ONLY)
 
 **D10 contains provisional Minecraft-native cuboid models for a diagnostic laser
@@ -387,3 +417,9 @@ The example manifest must report `SPEC ONLY`, because no Blender or GLB model ex
 5. Accept the owner's first laser `.blend`/GLB handoff and science intake before implementing OPT-001 in the game. Physically meaningful formulas remain owner-controlled.
 
 Primary docs: [D1 Audit](docs/M0_R2_1_D1_AUDIT.md) · [Charter](docs/PROJECT_CHARTER.md) · [Architecture](docs/ARCHITECTURE.md) · [World Interaction](docs/WORLD_INTERACTION_CONTRACT.md) · [Science Intake](docs/M1_SCIENCE_INTAKE.md) · [Blender Handoff](docs/BLENDER_ASSET_HANDOFF.md) · [M0-R2 Audit](docs/M0_R2_AUDIT.md).
+
+## D11 diagnostic laser beam (visual preview)
+
+D11 adds client-side, **false-colour red** particles along the D10 laser direction, with a Gaussian radius trend, 24-block air-only range, and stopping at physical obstructions and power-meter faces. The 780 nm demonstration laser is near-infrared; the visible line is a **diagnostic visualization**, not an assertion that the real beam glows in clean air. It does not modify D9 measured power or apply any world effect. See [D11_VISIBLE_BEAM.md](docs/D11_VISIBLE_BEAM.md).
+
+**Formal JDK25/NeoForge validation and in-game screenshots remain pending on this D11 change.**

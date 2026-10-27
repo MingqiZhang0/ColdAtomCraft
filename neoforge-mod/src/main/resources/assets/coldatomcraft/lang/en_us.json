@@ -11,5 +11,19 @@
   "message.coldatomcraft.preview.blocked": "[CAC DEV] Optical route blocked by a non-air block",
   "message.coldatomcraft.preview.unloaded": "[CAC DEV] Optical route enters an unloaded chunk",
   "message.coldatomcraft.preview.wrong_facing": "[CAC DEV] Source output points the wrong way",
-  "message.coldatomcraft.preview.shutter_closed": "[CAC DEV] Source found, shutter is closed"
+  "message.coldatomcraft.preview.shutter_closed": "[CAC DEV] Source found, shutter is closed",
+  "gui.coldatomcraft.laser.title": "CAC Laser Control Panel",
+  "gui.coldatomcraft.laser.left": "Turn Left",
+  "gui.coldatomcraft.laser.right": "Turn Right",
+  "gui.coldatomcraft.laser.power_on": "Laser: ON (click to disable)",
+  "gui.coldatomcraft.laser.power_off": "Laser: OFF (click to enable)",
+  "gui.coldatomcraft.laser.direction": "Output facing",
+  "gui.coldatomcraft.laser.power": "Output power",
+  "gui.coldatomcraft.laser.wavelength": "Vacuum wavelength",
+  "gui.coldatomcraft.laser.waist": "Waist radius",
+  "gui.coldatomcraft.laser.offset": "Waist position",
+  "gui.coldatomcraft.laser.done": "Done",
+  "gui.coldatomcraft.laser.disclaimer": "DEV preview: ideal vacuum TEM00, not calibrated",
+  "gui.coldatomcraft.laser.units": "Waist origin = output port; + means downstream",
+  "message.coldatomcraft.preview.config_missing": "[CAC preview] Laser found, but its settings are not loaded"
 }

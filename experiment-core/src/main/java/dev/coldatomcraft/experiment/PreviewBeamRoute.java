@@ -14,7 +14,7 @@ public final class PreviewBeamRoute {
         AIR, EMITTER_READY, EMITTER_OFF, EMITTER_WRONG_FACING, OBSTACLE, UNLOADED
     }
     public enum Status {
-        MEASURED, NO_SOURCE, BLOCKED, UNLOADED, WRONG_FACING, SHUTTER_CLOSED
+        MEASURED, NO_SOURCE, BLOCKED, UNLOADED, WRONG_FACING, SHUTTER_CLOSED, SOURCE_CONFIG_MISSING
     }
 
     public record Result(Status status, double powerWatts, int separationBlocks) {
@@ -41,14 +41,26 @@ public final class PreviewBeamRoute {
      * obstruction is deliberately not discovered or used. No forced load.
      */
     public static Result scan(int aperturePreset, IntFunction<Cell> cellAtDistance) {
+        return scan(aperturePreset, cellAtDistance, distance -> LaserTuning.DEFAULT);
+    }
+
+    /**
+     * Resolve the model from the server's source BE at the moment it is found.
+     * Missing source settings fail closed instead of fabricating calibration.
+     */
+    public static Result scan(int aperturePreset, IntFunction<Cell> cellAtDistance,
+                              IntFunction<LaserTuning> tuningAtDistance) {
         PreviewOpticalBench.apertureRadiusMeters(aperturePreset);
         Objects.requireNonNull(cellAtDistance, "cellAtDistance");
+        Objects.requireNonNull(tuningAtDistance, "tuningAtDistance");
         for (int d = 1; d <= PreviewOpticalBench.MAX_SEPARATION_BLOCKS; d++) {
             Cell cell = Objects.requireNonNull(cellAtDistance.apply(d), "unknown cell state");
             switch (cell) {
                 case AIR -> { continue; }
                 case EMITTER_READY -> {
-                    var reading = PreviewOpticalBench.sampleAligned(d, aperturePreset);
+                    LaserTuning tuning = tuningAtDistance.apply(d);
+                    if (tuning == null) return new Result(Status.SOURCE_CONFIG_MISSING, 0, d);
+                    var reading = PreviewOpticalBench.sampleAligned(d, aperturePreset, tuning);
                     return new Result(Status.MEASURED, reading.observation().value(), d);
                 }
                 case EMITTER_OFF -> { return new Result(Status.SHUTTER_CLOSED, 0, d); }

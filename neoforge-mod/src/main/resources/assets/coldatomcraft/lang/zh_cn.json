@@ -11,5 +11,19 @@
   "message.coldatomcraft.preview.blocked": "[CAC 测试] 光路被非空气方块遮挡",
   "message.coldatomcraft.preview.unloaded": "[CAC 测试] 光路进入未加载区块",
   "message.coldatomcraft.preview.wrong_facing": "[CAC 测试] 激光器朝向错误",
-  "message.coldatomcraft.preview.shutter_closed": "[CAC 测试] 找到激光器，但快门关闭"
+  "message.coldatomcraft.preview.shutter_closed": "[CAC 测试] 找到激光器，但快门关闭",
+  "gui.coldatomcraft.laser.title": "CAC 激光器参数控制台",
+  "gui.coldatomcraft.laser.left": "左转 90°",
+  "gui.coldatomcraft.laser.right": "右转 90°",
+  "gui.coldatomcraft.laser.power_on": "激光器：开启（点击关闭）",
+  "gui.coldatomcraft.laser.power_off": "激光器：关闭（点击开启）",
+  "gui.coldatomcraft.laser.direction": "输出朝向",
+  "gui.coldatomcraft.laser.power": "输出功率",
+  "gui.coldatomcraft.laser.wavelength": "真空波长",
+  "gui.coldatomcraft.laser.waist": "束腰半径",
+  "gui.coldatomcraft.laser.offset": "束腰位置",
+  "gui.coldatomcraft.laser.done": "关闭",
+  "gui.coldatomcraft.laser.disclaimer": "开发预览：理想真空 TEM00，非标定仪器",
+  "gui.coldatomcraft.laser.units": "束腰位置以输出口为零；正值表示前方",
+  "message.coldatomcraft.preview.config_missing": "[CAC 测试] 找到激光器，但参数尚未加载"
 }
