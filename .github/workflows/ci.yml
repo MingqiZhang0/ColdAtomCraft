@@ -50,7 +50,7 @@ jobs:
           python tools/test_preview_assets.py
           python -m unittest discover -s verification -p 'test_*.py' -v
           python tools/validate_assets.py assets/manifests/laser_source.example.json
-          python tools/check_source_manifest.py
+          python tools/check_source_manifest.py --mode checkout
 
       - name: Set up Gradle cache
         uses: gradle/actions/setup-gradle@v4
