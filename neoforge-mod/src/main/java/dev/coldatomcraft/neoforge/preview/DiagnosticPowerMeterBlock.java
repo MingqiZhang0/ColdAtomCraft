@@ -14,7 +14,7 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.level.block.state.properties.DirectionProperty;
+import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.phys.BlockHitResult;
 
@@ -27,7 +27,7 @@ import java.util.Locale;
  * calibration. No BlockEntity is needed for these finite, persisted states.
  */
 public final class DiagnosticPowerMeterBlock extends Block {
-    public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
+    public static final EnumProperty<Direction> FACING = BlockStateProperties.HORIZONTAL_FACING;
     public static final IntegerProperty APERTURE = IntegerProperty.create("aperture", 0, 2);
 
     public DiagnosticPowerMeterBlock(BlockBehaviour.Properties properties) {
@@ -55,13 +55,13 @@ public final class DiagnosticPowerMeterBlock extends Block {
             if (player.isShiftKeyDown()) {
                 int next = (state.getValue(APERTURE) + 1) % PreviewOpticalBench.aperturePresetCount();
                 level.setBlockAndUpdate(pos, state.setValue(APERTURE, next));
-                player.displayClientMessage(Component.translatable(
+                player.sendOverlayMessage(Component.translatable(
                         "message.coldatomcraft.preview.aperture",
                         String.format(Locale.ROOT, "%.1f",
-                                PreviewOpticalBench.apertureRadiusMeters(next) * 1000.0)), true);
+                                PreviewOpticalBench.apertureRadiusMeters(next) * 1000.0)));
             } else {
-                player.displayClientMessage(DiagnosticBeamScan.measure(
-                        serverLevel, pos, state.getValue(FACING), state.getValue(APERTURE)), true);
+                player.sendOverlayMessage(DiagnosticBeamScan.measure(
+                        serverLevel, pos, state.getValue(FACING), state.getValue(APERTURE)));
             }
         }
         return InteractionResult.SUCCESS;

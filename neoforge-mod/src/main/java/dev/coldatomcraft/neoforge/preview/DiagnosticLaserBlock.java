@@ -13,7 +13,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
-import net.minecraft.world.level.block.state.properties.DirectionProperty;
+import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.phys.BlockHitResult;
 
 /**
@@ -22,7 +22,7 @@ import net.minecraft.world.phys.BlockHitResult;
  * are implemented by the separate pure-Java PreviewOpticalBench fixture.
  */
 public final class DiagnosticLaserBlock extends Block {
-    public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
+    public static final EnumProperty<Direction> FACING = BlockStateProperties.HORIZONTAL_FACING;
     public static final BooleanProperty ENABLED = BooleanProperty.create("enabled");
 
     public DiagnosticLaserBlock(BlockBehaviour.Properties properties) {
@@ -51,14 +51,14 @@ public final class DiagnosticLaserBlock extends Block {
             if (player.isShiftKeyDown()) {
                 Direction rotated = state.getValue(FACING).getClockWise();
                 updated = state.setValue(FACING, rotated);
-                player.displayClientMessage(Component.translatable(
-                        "message.coldatomcraft.preview.laser_rotated", rotated.getName()), true);
+                player.sendOverlayMessage(Component.translatable(
+                        "message.coldatomcraft.preview.laser_rotated", rotated.getName()));
             } else {
                 boolean enabled = !state.getValue(ENABLED);
                 updated = state.setValue(ENABLED, enabled);
-                player.displayClientMessage(Component.translatable(
+                player.sendOverlayMessage(Component.translatable(
                         enabled ? "message.coldatomcraft.preview.laser_on"
-                                : "message.coldatomcraft.preview.laser_off"), true);
+                                : "message.coldatomcraft.preview.laser_off"));
             }
             level.setBlockAndUpdate(pos, updated);
         }
