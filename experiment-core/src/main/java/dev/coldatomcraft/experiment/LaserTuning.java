@@ -59,6 +59,12 @@ public record LaserTuning(int powerMilliwatts, int wavelengthNanometers,
         };
     }
 
+    /** Read-side safety predicate: the stored settings must never silently energize a source. */
+    public static boolean isValidStored(int power, int wavelength, int radius, int offset) {
+        try { new LaserTuning(power, wavelength, radius, offset); return true; }
+        catch (IllegalArgumentException invalid) { return false; }
+    }
+
     /** Corrupt or incompatible stored data is reset to a known safe test default. */
     public static LaserTuning fromStored(int power, int wavelength, int radius, int offset) {
         try { return new LaserTuning(power, wavelength, radius, offset); }

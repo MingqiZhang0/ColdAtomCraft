@@ -1,3 +1,24 @@
+# CAC D14 - 3D optical bench development checkpoint (source only)
+
+Adds six-direction diagnostic optical ports (mirror, ideal 50:50 splitter,
+ideal thin lens and half-wave plate), bounded ray/ABCD/Jones propagation,
+shared read-only client/server solver, six-way power meter and D13 multi-beam
+particle budget. Source/wavelength/waist GUI controls remain D12 development
+fixtures; no Create integration, MOT, BEC, laser damage or Blender assets.
+
+**D14 JAVA 25/NeoForge CI AND IN-GAME VALIDATION HAVE NOT BEEN RUN.**
+The existing GitHub main/D12 successful workflow is not D14 evidence.
+Pure Java reference and static integration tests are available locally;
+see [D14 manual and physics boundary](docs/D14_THREE_DIMENSIONAL_BENCH.md)
+and [D14 verification](verification/D14-three-dimensional-optics/README.md).
+No release, GitHub PR, branch or push was performed.
+
+---
+
+# D13 MULTI-BEAM VISUAL HOTFIX
+
+This checkpoint removes D12's arbitrary three-visible-laser cap. A shared dust-particle budget (1200 particles / 4 ticks) scales sample density across nearby enabled lasers while leaving measured power and saved settings untouched. See `docs/D13_MULTI_BEAM.md`.
+
 # CAC D12 — Laser parameter UI and per-device settings (development preview)
 
 **Status: SOURCE CHECKPOINT — NeoForge 26.3 JDK25/CI compilation and in-game UI remain unverified.**

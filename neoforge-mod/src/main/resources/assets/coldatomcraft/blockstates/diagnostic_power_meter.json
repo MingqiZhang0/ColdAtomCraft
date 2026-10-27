@@ -59,6 +59,36 @@
       "model": "coldatomcraft:block/diagnostic_power_meter_2",
       "y": 90,
       "uvlock": true
+    },
+    "aperture=0,facing=up": {
+      "model": "coldatomcraft:block/diagnostic_power_meter_0",
+      "x": 270,
+      "uvlock": true
+    },
+    "aperture=0,facing=down": {
+      "model": "coldatomcraft:block/diagnostic_power_meter_0",
+      "x": 90,
+      "uvlock": true
+    },
+    "aperture=1,facing=up": {
+      "model": "coldatomcraft:block/diagnostic_power_meter_1",
+      "x": 270,
+      "uvlock": true
+    },
+    "aperture=1,facing=down": {
+      "model": "coldatomcraft:block/diagnostic_power_meter_1",
+      "x": 90,
+      "uvlock": true
+    },
+    "aperture=2,facing=up": {
+      "model": "coldatomcraft:block/diagnostic_power_meter_2",
+      "x": 270,
+      "uvlock": true
+    },
+    "aperture=2,facing=down": {
+      "model": "coldatomcraft:block/diagnostic_power_meter_2",
+      "x": 90,
+      "uvlock": true
     }
   }
 }

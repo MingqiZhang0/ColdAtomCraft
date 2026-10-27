@@ -23,8 +23,10 @@ public final class LaserSettingsBlockEntity extends BlockEntity implements MenuP
     private static final String WAVELENGTH = "preview_wavelength_nm";
     private static final String WAIST = "preview_waist_um";
     private static final String OFFSET = "preview_waist_offset_mm";
+    private static final String VALID = "preview_config_valid";
 
     private LaserTuning tuning = LaserTuning.DEFAULT;
+    private boolean configurationValid = true;
 
     public LaserSettingsBlockEntity(BlockPos pos, BlockState state) {
         super(PreviewBlocks.LASER_BLOCK_ENTITY.get(), pos, state);
@@ -32,11 +34,15 @@ public final class LaserSettingsBlockEntity extends BlockEntity implements MenuP
 
     public LaserTuning tuning() { return tuning; }
 
+    /** Invalid saved settings stay optically disabled until the owner re-applies controls. */
+    public boolean configurationValid() { return configurationValid; }
+
     /** Called by the validated server menu only. */
     public void update(LaserTuning value) {
         if (value == null) throw new IllegalArgumentException("tuning required");
-        if (value.equals(tuning)) return;
+        if (value.equals(tuning) && configurationValid) return;
         tuning = value;
+        configurationValid = true;
         setChanged();
         if (level != null && !level.isClientSide()) {
             BlockState state = level.getBlockState(worldPosition);
@@ -47,11 +53,13 @@ public final class LaserSettingsBlockEntity extends BlockEntity implements MenuP
     @Override
     protected void loadAdditional(ValueInput input) {
         super.loadAdditional(input);
-        tuning = LaserTuning.fromStored(
-                input.getIntOr(POWER, LaserTuning.DEFAULT.powerMilliwatts()),
-                input.getIntOr(WAVELENGTH, LaserTuning.DEFAULT.wavelengthNanometers()),
-                input.getIntOr(WAIST, LaserTuning.DEFAULT.waistRadiusMicrometers()),
-                input.getIntOr(OFFSET, LaserTuning.DEFAULT.waistOffsetMillimeters()));
+        int savedPower = input.getIntOr(POWER, LaserTuning.DEFAULT.powerMilliwatts());
+        int savedWavelength = input.getIntOr(WAVELENGTH, LaserTuning.DEFAULT.wavelengthNanometers());
+        int savedWaist = input.getIntOr(WAIST, LaserTuning.DEFAULT.waistRadiusMicrometers());
+        int savedOffset = input.getIntOr(OFFSET, LaserTuning.DEFAULT.waistOffsetMillimeters());
+        configurationValid = input.getIntOr(VALID, 1) != 0
+                && LaserTuning.isValidStored(savedPower, savedWavelength, savedWaist, savedOffset);
+        tuning = LaserTuning.fromStored(savedPower, savedWavelength, savedWaist, savedOffset);
     }
 
     @Override
@@ -61,6 +69,7 @@ public final class LaserSettingsBlockEntity extends BlockEntity implements MenuP
         output.putInt(WAVELENGTH, tuning.wavelengthNanometers());
         output.putInt(WAIST, tuning.waistRadiusMicrometers());
         output.putInt(OFFSET, tuning.waistOffsetMillimeters());
+        output.putInt(VALID, configurationValid ? 1 : 0);
     }
 
     @Override

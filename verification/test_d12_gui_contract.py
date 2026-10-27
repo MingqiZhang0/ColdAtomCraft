@@ -50,11 +50,12 @@ class D12IntegrationContract(unittest.TestCase):
             self.assertIn(expected, body)
 
     def test_source_specific_meter_and_client_beam(self):
-        self.assertIn('source.tuning()', self.source('preview/DiagnosticBeamScan.java'))
+        adapter = self.source('preview/OpticalBenchWorld.java')
+        self.assertIn('source.tuning()', adapter)
         client = self.source('client/DiagnosticBeamParticles.java')
-        self.assertIn('LaserSettingsBlockEntity source', client)
-        self.assertIn('displayedRadiusBlocks(zMeters, tuning)', client)
-        self.assertIn('PreviewBeamColour.rgb(tuning.wavelengthNanometers())', client)
+        self.assertIn('OpticalBenchWorld.trace(level, sources)',client)
+        self.assertIn('segment.waveAt(fraction).radiusMeters()', client)
+        self.assertIn('PreviewBeamColour.rgb(wavelength)', client)
 
     def test_jars_require_d12_classes(self):
         inspected = (ROOT / 'tools/inspect_mod_jar.py').read_text()

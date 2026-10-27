@@ -90,4 +90,11 @@ class LaserTuningTest {
         assertTrue(PreviewBeamDisplay.displayedRadiusBlocks(dist, t) > 0);
         assertTrue(PreviewBeamDisplay.displayedRadiusBlocks(dist, t) <= 0.16);
     }
+    @Test void invalidSavedTuningFailsSafetyPredicate() {
+        assertTrue(LaserTuning.isValidStored(20,780,500,0));
+        assertFalse(LaserTuning.isValidStored(0,780,500,0));
+        assertFalse(LaserTuning.isValidStored(20,1200,500,0));
+        assertFalse(LaserTuning.isValidStored(20,780,0,0));
+        assertFalse(LaserTuning.isValidStored(20,780,500,9000));
+    }
 }

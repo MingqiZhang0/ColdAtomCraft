@@ -1,0 +1,124 @@
+{
+  "variants": {
+    "port=north_0": {
+      "model": "coldatomcraft:block/diagnostic_mirror_0",
+      "y": 0,
+      "uvlock": true
+    },
+    "port=east_0": {
+      "model": "coldatomcraft:block/diagnostic_mirror_0",
+      "y": 90,
+      "uvlock": true
+    },
+    "port=south_0": {
+      "model": "coldatomcraft:block/diagnostic_mirror_0",
+      "y": 180,
+      "uvlock": true
+    },
+    "port=west_0": {
+      "model": "coldatomcraft:block/diagnostic_mirror_0",
+      "y": 270,
+      "uvlock": true
+    },
+    "port=up_0": {
+      "model": "coldatomcraft:block/diagnostic_mirror_0",
+      "x": 90,
+      "uvlock": true
+    },
+    "port=down_0": {
+      "model": "coldatomcraft:block/diagnostic_mirror_0",
+      "x": 270,
+      "uvlock": true
+    },
+    "port=north_1": {
+      "model": "coldatomcraft:block/diagnostic_mirror_1",
+      "y": 0,
+      "uvlock": true
+    },
+    "port=east_1": {
+      "model": "coldatomcraft:block/diagnostic_mirror_1",
+      "y": 90,
+      "uvlock": true
+    },
+    "port=south_1": {
+      "model": "coldatomcraft:block/diagnostic_mirror_1",
+      "y": 180,
+      "uvlock": true
+    },
+    "port=west_1": {
+      "model": "coldatomcraft:block/diagnostic_mirror_1",
+      "y": 270,
+      "uvlock": true
+    },
+    "port=up_1": {
+      "model": "coldatomcraft:block/diagnostic_mirror_1",
+      "x": 90,
+      "uvlock": true
+    },
+    "port=down_1": {
+      "model": "coldatomcraft:block/diagnostic_mirror_1",
+      "x": 270,
+      "uvlock": true
+    },
+    "port=north_2": {
+      "model": "coldatomcraft:block/diagnostic_mirror_2",
+      "y": 0,
+      "uvlock": true
+    },
+    "port=east_2": {
+      "model": "coldatomcraft:block/diagnostic_mirror_2",
+      "y": 90,
+      "uvlock": true
+    },
+    "port=south_2": {
+      "model": "coldatomcraft:block/diagnostic_mirror_2",
+      "y": 180,
+      "uvlock": true
+    },
+    "port=west_2": {
+      "model": "coldatomcraft:block/diagnostic_mirror_2",
+      "y": 270,
+      "uvlock": true
+    },
+    "port=up_2": {
+      "model": "coldatomcraft:block/diagnostic_mirror_2",
+      "x": 90,
+      "uvlock": true
+    },
+    "port=down_2": {
+      "model": "coldatomcraft:block/diagnostic_mirror_2",
+      "x": 270,
+      "uvlock": true
+    },
+    "port=north_3": {
+      "model": "coldatomcraft:block/diagnostic_mirror_3",
+      "y": 0,
+      "uvlock": true
+    },
+    "port=east_3": {
+      "model": "coldatomcraft:block/diagnostic_mirror_3",
+      "y": 90,
+      "uvlock": true
+    },
+    "port=south_3": {
+      "model": "coldatomcraft:block/diagnostic_mirror_3",
+      "y": 180,
+      "uvlock": true
+    },
+    "port=west_3": {
+      "model": "coldatomcraft:block/diagnostic_mirror_3",
+      "y": 270,
+      "uvlock": true
+    },
+    "port=up_3": {
+      "model": "coldatomcraft:block/diagnostic_mirror_3",
+      "x": 90,
+      "uvlock": true
+    },
+    "port=down_3": {
+      "model": "coldatomcraft:block/diagnostic_mirror_3",
+      "x": 270,
+      "uvlock": true
+    }
+  }
+}

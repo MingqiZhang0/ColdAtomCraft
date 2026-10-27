@@ -1,3 +1,23 @@
+## CAC-M0-R2.1-D14 - 2026-10-27 - 3D diagnostic optical bench
+
+- Introduced a bounded independent Java six-direction axis-aligned ideal
+  optical network. Reused D5 Gaussian q, D6 Jones, and D9 ideal detector math.
+- Added lossless 90-degree mirror, ideal 50:50 splitter, ideal thin lens,
+  half-wave plate and 6-way detector as four new NeoForge optical device blocks
+  plus upgraded meter orientation. Device settings persist in blockstates.
+- Client beam display and server meter share the same read-only solver;
+  unfinished/multibranch results refuse ambiguous meter readings.
+- Fixed deterministic regeneration of D12 laser GUI localization; the legacy
+  D10 placeholder generator formerly discarded 14 existing translation keys.
+- Rebuilt and verified the complete SHA-256 source inventory with a new
+  fail-closed manifest checker, fixing D13 archive inventory drift.
+- Added invalid persisted laser-config fail-closed state while preserving
+  compatible old saved fields and manual valid-parameter recovery.
+- Added independent 3D Java smoke, formal JUnit 5 test source, contract tests,
+  source/asset validation and CI/JAR evidence gates.
+- Still NOT a physics-model approval, Minecraft Java 25 D14 build, runtime
+  signoff, real optical coating model, Blender asset integration or world effects.
+
 ## CAC-M0-R2.1-D10 (placeholder apparatus)
 
 - Added two DEV-only Minecraft cuboid equipment models, items, creative tab, server-side click interactions and blockstates.

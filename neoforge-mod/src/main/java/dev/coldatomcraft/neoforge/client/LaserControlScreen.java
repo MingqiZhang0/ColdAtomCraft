@@ -97,6 +97,10 @@ public final class LaserControlScreen extends AbstractContainerScreen<LaserContr
         graphics.text(font, Component.translatable("gui.coldatomcraft.laser.direction").getString()
                 + ": " + directionText(menu.value(LaserControlMenu.FACING)),
                 x + 14, y + 64, 0xFFB4D3E5);
+        if (menu.value(LaserControlMenu.VALID) == 0) {
+            graphics.text(font, Component.translatable("gui.coldatomcraft.laser.invalid").getString(),
+                    x + 170, y + 64, 0xFFFF6666);
+        }
         graphics.text(font, Component.translatable("gui.coldatomcraft.laser.disclaimer").getString(),
                 x + 14, y + 209, 0xFFFFC88A);
         graphics.text(font, Component.translatable("gui.coldatomcraft.laser.units").getString(),

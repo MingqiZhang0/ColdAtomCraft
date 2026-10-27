@@ -23,7 +23,8 @@ public final class LaserControlMenu extends AbstractContainerMenu {
     public static final int WAIST = 3;
     public static final int OFFSET = 4;
     public static final int FACING = 5;
-    public static final int DATA_COUNT = 6;
+    public static final int VALID = 6;
+    public static final int DATA_COUNT = 7;
 
     public static final int BUTTON_TOGGLE = 0;
     public static final int BUTTON_ROTATE_LEFT = 1;
@@ -52,6 +53,7 @@ public final class LaserControlMenu extends AbstractContainerMenu {
             clientData.set(WAVELENGTH, LaserTuning.DEFAULT.wavelengthNanometers());
             clientData.set(WAIST, LaserTuning.DEFAULT.waistRadiusMicrometers());
             clientData.set(OFFSET, LaserTuning.DEFAULT.waistOffsetMillimeters());
+            clientData.set(VALID, 1);
             this.data = clientData;
         } else {
             this.data = new ContainerData() {
@@ -67,6 +69,7 @@ public final class LaserControlMenu extends AbstractContainerMenu {
                         case OFFSET -> tuning.waistOffsetMillimeters();
                         case FACING -> block.is(PreviewBlocks.LASER.get())
                                 ? block.getValue(DiagnosticLaserBlock.FACING).get2DDataValue() : 0;
+                        case VALID -> source.configurationValid() ? 1 : 0;
                         default -> 0;
                     };
                 }
@@ -90,6 +93,7 @@ public final class LaserControlMenu extends AbstractContainerMenu {
         BlockState state = level.getBlockState(pos);
         if (!state.is(PreviewBlocks.LASER.get())) return false;
         if (buttonId == BUTTON_TOGGLE) {
+            if (!source.configurationValid() && !state.getValue(DiagnosticLaserBlock.ENABLED)) return false;
             level.setBlockAndUpdate(pos, state.setValue(DiagnosticLaserBlock.ENABLED,
                     !state.getValue(DiagnosticLaserBlock.ENABLED)));
         } else if (buttonId == BUTTON_ROTATE_LEFT || buttonId == BUTTON_ROTATE_RIGHT) {

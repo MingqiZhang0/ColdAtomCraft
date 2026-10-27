@@ -1,6 +1,8 @@
 package dev.coldatomcraft.neoforge.preview;
 
+import dev.coldatomcraft.experiment.PreviewOpticalNetwork3D;
 import dev.coldatomcraft.experiment.PreviewBeamRoute;
+import dev.coldatomcraft.experiment.PreviewOpticalBench;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
@@ -9,40 +11,58 @@ import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.Locale;
 
-/** The thin NeoForge-to-pure-core adapter for the DEV-only straight path. */
+/** Authoritative, read-only D14 meter measurement using the same solver as beam display. */
 final class DiagnosticBeamScan {
     private DiagnosticBeamScan() { }
 
     static Component measure(ServerLevel level, BlockPos receiverPos,
                              Direction receiverFront, int aperturePreset) {
-        if (receiverFront.getAxis().isVertical()) {
-            throw new IllegalArgumentException("receiver front must be horizontal");
-        }
-        PreviewBeamRoute.Result result = PreviewBeamRoute.scan(aperturePreset, distance -> {
-            BlockPos next = receiverPos.relative(receiverFront, distance);
-            if (!level.hasChunkAt(next)) {
-                return PreviewBeamRoute.Cell.UNLOADED;
+        // Read the actual server world at click time. The diagnostic search is
+        // deliberately finite, not a claim to collect all distant laser power.
+        var sources = OpticalBenchWorld.sourcesNear(level, receiverPos, 24, 12);
+        var optical = OpticalBenchWorld.trace(level, sources);
+        PreviewOpticalNetwork3D.MeterReading reading = optical.readingAt(
+                OpticalBenchWorld.toPosition(receiverPos));
+        return switch (reading.status()) {
+            case MEASURED -> Component.translatable("message.coldatomcraft.d14.reading",
+                    String.format(Locale.ROOT, "%.5f", reading.watts() * 1000.0));
+            case MULTIPLE_UNRESOLVED -> Component.translatable("message.coldatomcraft.d14.ambiguous",
+                    reading.incidentBranches());
+            case INCOMPLETE -> Component.translatable("message.coldatomcraft.d14.incomplete");
+            case NO_BEAM -> {
+                // D10's diagnostic distinctions remain available for horizontal
+                // straight-path failures, without ever authorizing power.
+                if (receiverFront.getAxis().isHorizontal()) {
+                    yield straightPathDiagnostic(level, receiverPos, receiverFront, aperturePreset);
+                }
+                yield Component.translatable("message.coldatomcraft.d14.no_beam");
             }
+        };
+    }
+
+    private static Component straightPathDiagnostic(ServerLevel level, BlockPos receiverPos,
+                                                    Direction receiverFront, int preset) {
+        PreviewBeamRoute.Result result = PreviewBeamRoute.scan(preset, distance -> {
+            BlockPos next = receiverPos.relative(receiverFront, distance);
+            if (!level.hasChunkAt(next)) return PreviewBeamRoute.Cell.UNLOADED;
             BlockState state = level.getBlockState(next);
             if (state.is(PreviewBlocks.LASER.get())) {
                 if (state.getValue(DiagnosticLaserBlock.FACING) != receiverFront.getOpposite()) {
                     return PreviewBeamRoute.Cell.EMITTER_WRONG_FACING;
                 }
                 return state.getValue(DiagnosticLaserBlock.ENABLED)
-                        ? PreviewBeamRoute.Cell.EMITTER_READY
-                        : PreviewBeamRoute.Cell.EMITTER_OFF;
+                        ? PreviewBeamRoute.Cell.EMITTER_READY : PreviewBeamRoute.Cell.EMITTER_OFF;
             }
             return state.isAir() ? PreviewBeamRoute.Cell.AIR : PreviewBeamRoute.Cell.OBSTACLE;
         }, distance -> {
             BlockPos next = receiverPos.relative(receiverFront, distance);
             return level.getBlockEntity(next) instanceof LaserSettingsBlockEntity source
-                    ? source.tuning() : null;
+                    && source.configurationValid() ? source.tuning() : null;
         });
         return switch (result.status()) {
-            case MEASURED -> Component.translatable("message.coldatomcraft.preview.reading",
-                    String.format(Locale.ROOT, "%.5f", result.powerWatts() * 1000.0),
-                    result.separationBlocks());
-            case NO_SOURCE -> Component.translatable("message.coldatomcraft.preview.no_source");
+            // If the pure D14 network could not find a source, do not report a
+            // D10 fallback value as though D14's complete 3D network saw it.
+            case MEASURED, NO_SOURCE -> Component.translatable("message.coldatomcraft.d14.no_beam");
             case BLOCKED -> Component.translatable("message.coldatomcraft.preview.blocked");
             case UNLOADED -> Component.translatable("message.coldatomcraft.preview.unloaded");
             case WRONG_FACING -> Component.translatable("message.coldatomcraft.preview.wrong_facing");

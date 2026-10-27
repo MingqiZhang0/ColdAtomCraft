@@ -91,3 +91,7 @@ write_json(base/'lang'/'zh_cn.json', {
 'message.coldatomcraft.preview.shutter_closed':'[CAC 测试] 找到激光器，但快门关闭',
 })
 print('assets done')
+
+# Keep the legacy D10-D12 placeholder generator deterministic if run after D14.
+import runpy
+runpy.run_path(str(Path(__file__).with_name('generate_d14_assets.py')), run_name='__main__')

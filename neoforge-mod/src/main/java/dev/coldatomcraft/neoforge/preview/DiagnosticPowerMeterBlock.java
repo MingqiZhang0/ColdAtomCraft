@@ -27,7 +27,7 @@ import java.util.Locale;
  * calibration. No BlockEntity is needed for these finite, persisted states.
  */
 public final class DiagnosticPowerMeterBlock extends Block {
-    public static final EnumProperty<Direction> FACING = BlockStateProperties.HORIZONTAL_FACING;
+    public static final EnumProperty<Direction> FACING = BlockStateProperties.FACING;
     public static final IntegerProperty APERTURE = IntegerProperty.create("aperture", 0, 2);
 
     public DiagnosticPowerMeterBlock(BlockBehaviour.Properties properties) {
@@ -40,7 +40,7 @@ public final class DiagnosticPowerMeterBlock extends Block {
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext context) {
         // Its FRONT FACE points toward the placing player, i.e. toward the beam source.
-        return defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite());
+        return defaultBlockState().setValue(FACING, context.getNearestLookingDirection().getOpposite());
     }
 
     @Override
