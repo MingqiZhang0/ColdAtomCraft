@@ -65,6 +65,37 @@ class D14IntegrationContract(unittest.TestCase):
         self.assertIn('state.setValue(PORT, next)',optic)
         self.assertIn('createBlockStateDefinition(',optic)
         self.assertNotIn('newBlockEntity(',optic)
+    def test_optic_placement_front_faces_player_while_input_follows_incident_beam(self):
+        # PORT is the travel direction of incident light, NOT the front-facing
+        # direction. A player placing the optic looks along incoming light;
+        # the model opening must point back toward that player.
+        optic = read('neoforge-mod/src/main/java/dev/coldatomcraft/neoforge/preview/DiagnosticOpticBlock.java')
+        placement = optic.split('public BlockState getStateForPlacement(', 1)[1].split('\n    @Override', 1)[0]
+        self.assertIn('OpticalBenchWorld.fromMinecraft(context.getHorizontalDirection())', placement)
+        self.assertNotIn('getHorizontalDirection().getOpposite()', placement)
+
+        # All four placeholder models have their visible port on local +Z
+        # (south). The blockstate rotates that front opposite to incoming ray
+        # travel; preserve this mapping instead of turning the models 180 deg.
+        rotations = {
+            'north': ('y', 0), 'east': ('y', 90),
+            'south': ('y', 180), 'west': ('y', 270),
+            'up': ('x', 90), 'down': ('x', 270),
+        }
+        for name in ('diagnostic_mirror', 'diagnostic_splitter',
+                     'diagnostic_lens', 'diagnostic_half_wave_plate'):
+            model = json.loads((ASSETS/'models/block'/f'{name}_0.json').read_text(encoding='utf-8'))
+            openings = [e for e in model['elements']
+                        if e['faces']['south']['texture'] == '#port' and e['to'][2] == 16]
+            self.assertEqual(1, len(openings), name)
+            states = json.loads((ASSETS/'blockstates'/f'{name}.json').read_text(encoding='utf-8'))['variants']
+            for incoming, (axis, angle) in rotations.items():
+                for selector in range(4):
+                    with self.subTest(block=name, incoming=incoming, selector=selector):
+                        definition = states[f'port={incoming}_{selector}']
+                        self.assertEqual(angle, definition[axis])
+                        self.assertNotIn('x' if axis == 'y' else 'y', definition)
+
     def test_power_meter_can_face_all_cardinal_directions(self):
         meter=read('neoforge-mod/src/main/java/dev/coldatomcraft/neoforge/preview/DiagnosticPowerMeterBlock.java')
         self.assertIn('BlockStateProperties.FACING',meter)

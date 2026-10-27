@@ -41,8 +41,10 @@ public final class DiagnosticOpticBlock extends Block {
 
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext context) {
-        // Incoming travel direction points away from the placing player.
-        var direction = OpticalBenchWorld.fromMinecraft(context.getHorizontalDirection().getOpposite());
+        // PORT is the INCOMING LIGHT TRAVEL DIRECTION, not the visible front.
+        // The player looks along the incident beam; the model's front faces back
+        // toward the player (opposite to incoming travel) via the blockstate model.
+        var direction = OpticalBenchWorld.fromMinecraft(context.getHorizontalDirection());
         return defaultBlockState().setValue(PORT, OpticPortPreset.of(direction, 0));
     }
 
