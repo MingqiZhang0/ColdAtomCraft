@@ -28,6 +28,16 @@ public interface EntityBlock {BlockEntity newBlockEntity(BlockPos pos,BlockState
 'net/minecraft/core/Direction.java': '''package net.minecraft.core;
 public enum Direction {NORTH,SOUTH,EAST,WEST,UP,DOWN}
 ''',
+'net/minecraft/world/level/BlockGetter.java': '''package net.minecraft.world.level;
+public interface BlockGetter {}
+''',
+'net/minecraft/world/phys/shapes/CollisionContext.java': '''package net.minecraft.world.phys.shapes;
+public final class CollisionContext {}
+''',
+'net/minecraft/world/phys/shapes/VoxelShape.java': '''package net.minecraft.world.phys.shapes;
+public record VoxelShape(double minX,double minY,double minZ,
+                         double maxX,double maxY,double maxZ) {}
+''',
 'net/minecraft/server/MinecraftServer.java': '''package net.minecraft.server;
 public final class MinecraftServer {
  public boolean onThread=true;
@@ -44,12 +54,24 @@ public record Property<T>(String key) {}
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.VoxelShape;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 public class Block {
  public Block(BlockBehaviour.Properties props){}
+ protected static VoxelShape box(double minX,double minY,double minZ,
+                                 double maxX,double maxY,double maxZ){
+  return new VoxelShape(minX/16.0,minY/16.0,minZ/16.0,
+                        maxX/16.0,maxY/16.0,maxZ/16.0);
+ }
+ protected VoxelShape getShape(BlockState state, BlockGetter level,
+                               BlockPos pos, CollisionContext context){
+  return box(0,0,0,16,16,16);
+ }
  protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos,
                                              Player player, BlockHitResult hit){return InteractionResult.SUCCESS;}
 }
@@ -75,7 +97,7 @@ public class BlockEntity {
 }
 ''',
 'net/minecraft/world/level/Level.java': '''package net.minecraft.world.level;
-public abstract class Level {}
+public abstract class Level implements BlockGetter {}
 ''',
 'net/minecraft/server/level/ServerLevel.java': '''package net.minecraft.server.level;
 import java.util.HashMap;import java.util.HashSet;import java.util.Map;import java.util.Set;
@@ -119,11 +141,20 @@ public enum InteractionResult {SUCCESS}
 import net.minecraft.network.chat.Component;
 public final class Player {
  public Component last;
+ public boolean shiftKeyDown;
+ public boolean isShiftKeyDown(){return shiftKeyDown;}
  public void sendSystemMessage(Component c){last=c;}
+ public void sendOverlayMessage(Component c){last=c;}
 }
 ''',
 'net/minecraft/world/phys/BlockHitResult.java': '''package net.minecraft.world.phys;
-public final class BlockHitResult {}
+import net.minecraft.core.Direction;
+public final class BlockHitResult {
+ private final Direction direction;
+ public BlockHitResult(){this(Direction.UP);}
+ public BlockHitResult(Direction direction){this.direction=direction;}
+ public Direction getDirection(){return direction;}
+}
 ''',
 'dev/coldatomcraft/neoforge/preview/PreviewBlocks.java': '''package dev.coldatomcraft.neoforge.preview;
 public final class PreviewBlocks {
@@ -211,6 +242,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.shapes.CollisionContext;
 public final class AdapterSmoke {
  private static int tests;
  private static void check(boolean yes,String msg){tests++;if(!yes)throw new AssertionError(msg);}
@@ -252,7 +284,19 @@ public final class AdapterSmoke {
   check(LoadedLabGeometryWorld.verify(world,rig)==Check.VALID,"valid now");
   var player=new Player();
   var inspector=new DiagnosticOpticalTableBlock(new BlockBehaviour.Properties());
-  inspector.useWithoutItem(world.states.get(table),world,table,player,new BlockHitResult());
+  var shape=inspector.getShape(world.states.get(table),world,table,new CollisionContext());
+  check(shape.maxY()==13.0/16.0,"tabletop is 13/16 high, not full cube");
+  inspector.useWithoutItem(world.states.get(table),world,table,player,
+                           new BlockHitResult(Direction.NORTH));
+  check(player.last.text().contains("put a stage between"),
+        "ordinary side click gives mounting guidance, not inspection");
+  player.shiftKeyDown=true;
+  inspector.useWithoutItem(world.states.get(table),world,table,player,
+                           new BlockHitResult(Direction.NORTH));
+  check(player.last.text().contains("put a stage between"),
+        "sneak side click still gives mounting guidance");
+  inspector.useWithoutItem(world.states.get(table),world,table,player,
+                           new BlockHitResult(Direction.UP));
   check(player.last.text().contains("READ_ONLY_SERVER_SNAPSHOT"),"visible inspector message");
   check(player.last.text().contains("INCIDENT_TRAVEL=SOUTH"),"correct incoming optics convention");
   world.states.put(optic,new BlockState(new DiagnosticOpticBlock(DiagnosticOpticBlock.Kind.MIRROR))
