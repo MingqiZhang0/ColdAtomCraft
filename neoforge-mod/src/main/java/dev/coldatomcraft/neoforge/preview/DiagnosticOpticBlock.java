@@ -46,11 +46,6 @@ public final class DiagnosticOpticBlock extends Block implements EntityBlock {
     }
 
 
-    @Override public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
-        return new DiagnosticApparatusIdentityBlockEntity(pos, state);
-    }
-
-
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext context) {
         // PORT is the INCOMING LIGHT TRAVEL DIRECTION, not the visible front.
