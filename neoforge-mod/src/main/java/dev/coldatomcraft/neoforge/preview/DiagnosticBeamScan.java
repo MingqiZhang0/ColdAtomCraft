@@ -19,10 +19,7 @@ final class DiagnosticBeamScan {
                              Direction receiverFront, int aperturePreset) {
         // Read the actual server world at click time. The diagnostic search is
         // deliberately finite, not a claim to collect all distant laser power.
-        var sources = OpticalBenchWorld.sourcesNear(level, receiverPos, 24, 12);
-        var optical = OpticalBenchWorld.trace(level, sources);
-        PreviewOpticalNetwork3D.MeterReading reading = optical.readingAt(
-                OpticalBenchWorld.toPosition(receiverPos));
+        PreviewOpticalNetwork3D.MeterReading reading = sample(level, receiverPos);
         return switch (reading.status()) {
             case MEASURED -> Component.translatable("message.coldatomcraft.d14.reading",
                     String.format(Locale.ROOT, "%.5f", reading.watts() * 1000.0));
@@ -38,6 +35,13 @@ final class DiagnosticBeamScan {
                 yield Component.translatable("message.coldatomcraft.d14.no_beam");
             }
         };
+    }
+
+    /** Authoritative observation for an external long-term data logger. */
+    static PreviewOpticalNetwork3D.MeterReading sample(ServerLevel level, BlockPos receiverPos) {
+        var sources = OpticalBenchWorld.sourcesNear(level, receiverPos, 24, 12);
+        var optical = OpticalBenchWorld.trace(level, sources);
+        return optical.readingAt(OpticalBenchWorld.toPosition(receiverPos));
     }
 
     private static Component straightPathDiagnostic(ServerLevel level, BlockPos receiverPos,

@@ -144,3 +144,10 @@ for locale in ['en_us','zh_cn']:
     write_json(path,lang)
 
 print('D14 assets: 4 optics x 24 states + vertical power meter, with DEV placeholders')
+
+# D21 assets are additive, and must survive the existing D10/D14 generator.
+from pathlib import Path as _D21Path
+import runpy as _d21_runpy
+_d21_script = _D21Path(__file__).with_name('generate_d21_assets.py')
+if _d21_script.is_file():
+    _d21_runpy.run_path(str(_d21_script), run_name='__main__')

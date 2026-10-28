@@ -10,6 +10,8 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.EntityBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
@@ -24,9 +26,10 @@ import java.util.Locale;
  * DEV-only detector with a visible placeholder model and three discrete
  * aperture presets. All readings are recomputed from authoritative server
  * blockstates on right-click; none are cached or presented as real instrument
- * calibration. No BlockEntity is needed for these finite, persisted states.
+ * calibration. A D22F BlockEntity now persists apparatus identity only;
+ * aperture and facing are still ordinary persisted BlockState properties.
  */
-public final class DiagnosticPowerMeterBlock extends Block {
+public final class DiagnosticPowerMeterBlock extends Block implements EntityBlock {
     public static final EnumProperty<Direction> FACING = BlockStateProperties.FACING;
     public static final IntegerProperty APERTURE = IntegerProperty.create("aperture", 0, 2);
 
@@ -35,6 +38,10 @@ public final class DiagnosticPowerMeterBlock extends Block {
         registerDefaultState(stateDefinition.any()
                 .setValue(FACING, Direction.NORTH)
                 .setValue(APERTURE, 0));
+    }
+
+    @Override public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
+        return new DiagnosticApparatusIdentityBlockEntity(pos, state);
     }
 
     @Override
@@ -54,7 +61,13 @@ public final class DiagnosticPowerMeterBlock extends Block {
         if (level instanceof ServerLevel serverLevel) {
             if (player.isShiftKeyDown()) {
                 int next = (state.getValue(APERTURE) + 1) % PreviewOpticalBench.aperturePresetCount();
-                level.setBlockAndUpdate(pos, state.setValue(APERTURE, next));
+                BlockState changed = state.setValue(APERTURE, next);
+                var identity = level.getBlockEntity(pos) instanceof DiagnosticApparatusIdentityBlockEntity be
+                        && be.identityUsable() ? be : null;
+                var previous = identity == null ? null : identity.identityToken();
+                if (level.setBlockAndUpdate(pos, changed) && identity != null) {
+                    identity.confirmControlledChange(state, changed, previous);
+                }
                 player.sendOverlayMessage(Component.translatable(
                         "message.coldatomcraft.preview.aperture",
                         String.format(Locale.ROOT, "%.1f",

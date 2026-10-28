@@ -10,6 +10,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.EntityBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
@@ -25,7 +27,7 @@ import net.minecraft.world.phys.BlockHitResult;
  * the six world directions. Inputs are one-directional by design; all other
  * ports are treated as opaque until a reciprocal multiport model exists.</p>
  */
-public final class DiagnosticOpticBlock extends Block {
+public final class DiagnosticOpticBlock extends Block implements EntityBlock {
     public enum Kind { MIRROR, SPLITTER, LENS, HALF_WAVE_PLATE }
     public static final EnumProperty<OpticPortPreset> PORT =
             EnumProperty.create("port", OpticPortPreset.class);
@@ -38,6 +40,16 @@ public final class DiagnosticOpticBlock extends Block {
         registerDefaultState(stateDefinition.any().setValue(PORT, OpticPortPreset.SOUTH_0));
     }
     public Kind kind() { return kind; }
+
+    @Override public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
+        return new DiagnosticApparatusIdentityBlockEntity(pos, state);
+    }
+
+
+    @Override public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
+        return new DiagnosticApparatusIdentityBlockEntity(pos, state);
+    }
+
 
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext context) {
@@ -71,7 +83,13 @@ public final class DiagnosticOpticBlock extends Block {
             OpticPortPreset current = state.getValue(PORT);
             OpticPortPreset next = player.isShiftKeyDown()
                     ? current.nextIncoming() : current.nextSelector();
-            level.setBlockAndUpdate(pos, state.setValue(PORT, next));
+            BlockState changed = state.setValue(PORT, next);
+            var identity = level.getBlockEntity(pos) instanceof DiagnosticApparatusIdentityBlockEntity be
+                    && be.identityUsable() ? be : null;
+            var previous = identity == null ? null : identity.identityToken();
+            if (level.setBlockAndUpdate(pos, changed) && identity != null) {
+                identity.confirmControlledChange(state, changed, previous);
+            }
             String description = switch (kind) {
                 case MIRROR, SPLITTER -> next.reflected().name();
                 case LENS -> String.format(java.util.Locale.ROOT, "f = %.2f m", next.focalLengthMeters());

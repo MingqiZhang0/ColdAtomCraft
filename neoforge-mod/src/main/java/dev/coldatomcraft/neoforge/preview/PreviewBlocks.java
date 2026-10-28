@@ -47,12 +47,46 @@ public final class PreviewBlocks {
             "diagnostic_half_wave_plate", props -> new DiagnosticOpticBlock(DiagnosticOpticBlock.Kind.HALF_WAVE_PLATE, props),
             props -> props.strength(1.5f).noOcclusion());
 
+    // D21 laboratory instrumentation and manual precision-stage stand-ins.
+    public static final DeferredBlock<DiagnosticPowerLoggerBlock> LOGGER = BLOCKS.registerBlock(
+            "diagnostic_power_logger", DiagnosticPowerLoggerBlock::new,
+            props -> props.strength(1.5f).noOcclusion());
+    public static final DeferredBlock<DiagnosticOpticalTableBlock> OPTICAL_TABLE = BLOCKS.registerBlock(
+            "diagnostic_optical_table", DiagnosticOpticalTableBlock::new,
+            props -> props.strength(2.5f));
+    public static final DeferredBlock<DiagnosticStageBlock> LINEAR_STAGE = BLOCKS.registerBlock(
+            "diagnostic_linear_stage", props -> new DiagnosticStageBlock(DiagnosticStageBlock.Kind.LINEAR, props),
+            props -> props.strength(1.5f).noOcclusion());
+    public static final DeferredBlock<DiagnosticStageBlock> ROTARY_STAGE = BLOCKS.registerBlock(
+            "diagnostic_rotary_stage", props -> new DiagnosticStageBlock(DiagnosticStageBlock.Kind.ROTARY, props),
+            props -> props.strength(1.5f).noOcclusion());
+
+    // D22B coarse real-world optical preset scan (NOT a precision motor).
+    public static final DeferredBlock<AutoPresetStageBlock> AUTO_PRESET_STAGE = BLOCKS.registerBlock(
+            "diagnostic_auto_preset_stage", AutoPresetStageBlock::new,
+            props -> props.strength(1.5f).noOcclusion());
+
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<LaserSettingsBlockEntity>>
             LASER_BLOCK_ENTITY = BLOCK_ENTITIES.register("diagnostic_laser_settings",
             () -> new BlockEntityType<>(LaserSettingsBlockEntity::new, LASER.get()));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<PowerLoggerBlockEntity>>
+            LOGGER_BLOCK_ENTITY = BLOCK_ENTITIES.register("diagnostic_power_logger_data",
+            () -> new BlockEntityType<>(PowerLoggerBlockEntity::new, LOGGER.get()));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<AutoPresetStageBlockEntity>>
+            AUTO_PRESET_STAGE_BLOCK_ENTITY = BLOCK_ENTITIES.register("diagnostic_auto_preset_stage_data",
+            () -> new BlockEntityType<>(AutoPresetStageBlockEntity::new, AUTO_PRESET_STAGE.get()));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<DiagnosticApparatusIdentityBlockEntity>>
+            APPARATUS_IDENTITY_BLOCK_ENTITY = BLOCK_ENTITIES.register("diagnostic_apparatus_identity",
+            () -> new BlockEntityType<>(DiagnosticApparatusIdentityBlockEntity::new,
+                    METER.get(), MIRROR.get(), SPLITTER.get(), LENS.get(), HALF_WAVE.get(),
+                    OPTICAL_TABLE.get()));
     public static final DeferredHolder<MenuType<?>, MenuType<LaserControlMenu>> LASER_MENU =
             MENUS.register("diagnostic_laser_control",
                     () -> new MenuType<>(LaserControlMenu::new, FeatureFlags.VANILLA_SET));
+
+    public static final DeferredHolder<MenuType<?>, MenuType<PowerLoggerMenu>> LOGGER_MENU =
+            MENUS.register("diagnostic_power_logger_menu",
+                    () -> new MenuType<>(PowerLoggerMenu::new, FeatureFlags.VANILLA_SET));
 
     public static final DeferredItem<?> LASER_ITEM = ITEMS.registerSimpleBlockItem("diagnostic_laser", LASER);
     public static final DeferredItem<?> METER_ITEM = ITEMS.registerSimpleBlockItem("diagnostic_power_meter", METER);
@@ -60,6 +94,13 @@ public final class PreviewBlocks {
     public static final DeferredItem<?> SPLITTER_ITEM = ITEMS.registerSimpleBlockItem("diagnostic_splitter", SPLITTER);
     public static final DeferredItem<?> LENS_ITEM = ITEMS.registerSimpleBlockItem("diagnostic_lens", LENS);
     public static final DeferredItem<?> HALF_WAVE_ITEM = ITEMS.registerSimpleBlockItem("diagnostic_half_wave_plate", HALF_WAVE);
+
+    public static final DeferredItem<?> LOGGER_ITEM = ITEMS.registerSimpleBlockItem("diagnostic_power_logger", LOGGER);
+    public static final DeferredItem<?> TABLE_ITEM = ITEMS.registerSimpleBlockItem("diagnostic_optical_table", OPTICAL_TABLE);
+    public static final DeferredItem<?> LINEAR_STAGE_ITEM = ITEMS.registerSimpleBlockItem("diagnostic_linear_stage", LINEAR_STAGE);
+    public static final DeferredItem<?> ROTARY_STAGE_ITEM = ITEMS.registerSimpleBlockItem("diagnostic_rotary_stage", ROTARY_STAGE);
+    public static final DeferredItem<?> AUTO_PRESET_STAGE_ITEM = ITEMS.registerSimpleBlockItem(
+            "diagnostic_auto_preset_stage", AUTO_PRESET_STAGE);
 
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> TAB = TABS.register(
             "lab_preview", () -> CreativeModeTab.builder()
@@ -72,6 +113,11 @@ public final class PreviewBlocks {
                         output.accept(SPLITTER_ITEM.get());
                         output.accept(LENS_ITEM.get());
                         output.accept(HALF_WAVE_ITEM.get());
+                        output.accept(LOGGER_ITEM.get());
+                        output.accept(TABLE_ITEM.get());
+                        output.accept(LINEAR_STAGE_ITEM.get());
+                        output.accept(ROTARY_STAGE_ITEM.get());
+                        output.accept(AUTO_PRESET_STAGE_ITEM.get());
                     }).build());
 
     private PreviewBlocks() { }

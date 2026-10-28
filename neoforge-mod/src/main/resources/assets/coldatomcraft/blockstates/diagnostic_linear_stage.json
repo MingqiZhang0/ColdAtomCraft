@@ -1,0 +1,24 @@
+{
+  "variants": {
+    "facing=south": {
+      "model": "coldatomcraft:block/diagnostic_linear_stage",
+      "y": 0,
+      "uvlock": true
+    },
+    "facing=east": {
+      "model": "coldatomcraft:block/diagnostic_linear_stage",
+      "y": 270,
+      "uvlock": true
+    },
+    "facing=north": {
+      "model": "coldatomcraft:block/diagnostic_linear_stage",
+      "y": 180,
+      "uvlock": true
+    },
+    "facing=west": {
+      "model": "coldatomcraft:block/diagnostic_linear_stage",
+      "y": 90,
+      "uvlock": true
+    }
+  }
+}

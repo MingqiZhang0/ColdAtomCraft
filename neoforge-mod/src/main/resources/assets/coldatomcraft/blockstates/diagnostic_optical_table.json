@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "coldatomcraft:block/diagnostic_optical_table"
+    }
+  }
+}

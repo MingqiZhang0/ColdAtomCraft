@@ -64,7 +64,7 @@ class D14IntegrationContract(unittest.TestCase):
         self.assertIn('EnumProperty.create("port", OpticPortPreset.class)',optic)
         self.assertIn('state.setValue(PORT, next)',optic)
         self.assertIn('createBlockStateDefinition(',optic)
-        self.assertNotIn('newBlockEntity(',optic)
+        self.assertIn('newBlockEntity(',optic)  # D22F: same D14 optical state, persistent identity BE
     def test_optic_placement_front_faces_player_while_input_follows_incident_beam(self):
         # PORT is the travel direction of incident light, NOT the front-facing
         # direction. A player placing the optic looks along incoming light;

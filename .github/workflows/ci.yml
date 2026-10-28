@@ -47,6 +47,20 @@ jobs:
           bash verification/D11-visible-beam/run_visual_offline.sh
           python tools/check_multi_beam.py
           python tools/check_d14_optics.py
+          python tools/check_d21_measurement.py
+          python tools/check_d21b_ui.py
+          python tools/check_d21c_history.py
+          python tools/check_d21d_comparison.py
+          python tools/check_d22_stage_scan.py
+          python tools/check_d22b_preset_scan.py
+          python tools/check_d22c_continuous_optics.py
+          python tools/check_d22d_geometry.py
+          python tools/check_d22e_live_geometry.py
+          python tools/check_d22e_junit_source.py
+          python tools/check_d22e_game_adapter.py
+          python tools/check_d22f_identity.py
+          python tools/check_d22f_junit_source.py
+          python tools/check_d22f_game_identity.py
           python tools/test_preview_assets.py
           python -m unittest discover -s verification -p 'test_*.py' -v
           python tools/validate_assets.py assets/manifests/laser_source.example.json

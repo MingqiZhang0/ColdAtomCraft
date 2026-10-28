@@ -55,9 +55,20 @@ class PreviewAssetTests(unittest.TestCase):
                 self.assertEqual(expected,set(variants))
                 self.assertEqual(4,len({v['model'] for v in variants.values()}))
 
+    def test_d21_stage_models_and_states(self):
+        for name in ('diagnostic_linear_stage','diagnostic_rotary_stage'):
+            variants=read_json(ASSETS/'blockstates'/f'{name}.json')['variants']
+            self.assertEqual({f'facing={d}' for d in ('north','south','east','west')},set(variants))
+            yaw={'south':0,'east':270,'north':180,'west':90}
+            for direction,angle in yaw.items():
+                self.assertEqual(angle,variants[f'facing={direction}']['y'])
+        self.assertEqual({''},set(read_json(ASSETS/'blockstates/diagnostic_optical_table.json')['variants']))
+        self.assertEqual({''},set(read_json(ASSETS/'blockstates/diagnostic_power_logger.json')['variants']))
+        self.assertEqual({''},set(read_json(ASSETS/'blockstates/diagnostic_auto_preset_stage.json')['variants']))
+
     def test_all_models_are_vanilla_textured_cuboids(self):
         models = sorted((ASSETS/'models'/'block').glob('*.json'))
-        self.assertEqual(21, len(models))
+        self.assertEqual(26, len(models))
         for p in models:
             value = read_json(p)
             with self.subTest(model=p.name):
@@ -96,7 +107,7 @@ class PreviewAssetTests(unittest.TestCase):
             self.assertEqual(7/16,(fronts[0]-8)/16)
 
     def test_item_definitions_resolve_to_block_model(self):
-        for name in ('diagnostic_laser','diagnostic_power_meter','diagnostic_mirror','diagnostic_splitter','diagnostic_lens','diagnostic_half_wave_plate'):
+        for name in ('diagnostic_laser','diagnostic_power_meter','diagnostic_mirror','diagnostic_splitter','diagnostic_lens','diagnostic_half_wave_plate','diagnostic_power_logger','diagnostic_optical_table','diagnostic_linear_stage','diagnostic_rotary_stage','diagnostic_auto_preset_stage'):
             with self.subTest(item=name):
                 definition=read_json(ASSETS/'items'/f'{name}.json')['model']
                 self.assertEqual('minecraft:model',definition['type'])
@@ -109,11 +120,11 @@ class PreviewAssetTests(unittest.TestCase):
         chinese=read_json(ASSETS/'lang'/'zh_cn.json')
         self.assertEqual(set(english),set(chinese))
         self.assertIn('itemGroup.coldatomcraft.lab_preview',english)
-        for name in ('diagnostic_laser','diagnostic_power_meter','diagnostic_mirror','diagnostic_splitter','diagnostic_lens','diagnostic_half_wave_plate'):
+        for name in ('diagnostic_laser','diagnostic_power_meter','diagnostic_mirror','diagnostic_splitter','diagnostic_lens','diagnostic_half_wave_plate','diagnostic_power_logger','diagnostic_optical_table','diagnostic_linear_stage','diagnostic_rotary_stage','diagnostic_auto_preset_stage'):
             self.assertIn('block.coldatomcraft.'+name,english)
 
     def test_block_loot_tables_exist(self):
-        for name in ('diagnostic_laser','diagnostic_power_meter','diagnostic_mirror','diagnostic_splitter','diagnostic_lens','diagnostic_half_wave_plate'):
+        for name in ('diagnostic_laser','diagnostic_power_meter','diagnostic_mirror','diagnostic_splitter','diagnostic_lens','diagnostic_half_wave_plate','diagnostic_power_logger','diagnostic_optical_table','diagnostic_linear_stage','diagnostic_rotary_stage','diagnostic_auto_preset_stage'):
             with self.subTest(block=name):
                 value=read_json(DATA/'loot_table'/'blocks'/f'{name}.json')
                 self.assertEqual('minecraft:block',value['type'])

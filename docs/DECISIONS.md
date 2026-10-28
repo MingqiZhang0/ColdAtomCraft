@@ -186,3 +186,37 @@ Owner chose standard real experimental laser optics. D5 engineers an independent
   relative retardance. D6's two-argument factory sets the common phase zero
   by gauge choice only; real arm-to-arm interference needs explicit
   `withUniformPhaseRadians` or an approved calibrated optical path model.
+
+## CAC-D21C-ARCHIVE (2026-10-27) — historical data without client file access
+
+- Retain the D21A server-generated recorder identity and append-only CSV as the
+  authoritative long-term observation archive; do not reinterpret invalid
+  statuses as zero optical watts or game ticks as SI seconds.
+- Add bounded 32-point, 16-KiB-row-data server-side disk page reads through an
+  authenticated D21B menu, with frozen size-based snapshot navigation.
+- Only pages selected by the validated server may be exported as separate
+  `.history-page.csv/.svg` files. No user-supplied paths, no automatic client
+  file download, no claim of per-user ownership permissions.
+- Archive parse/consistency failures fail closed (no false graph; pause logger).
+- Pure Java checks and NeoForge-shaped mocks are not formal JDK25/game tests;
+  D21C release acceptance remains pending.
+
+## CAC-D22A (engineering draft, 2026-10-28) — Feedback-verified stage scan reference
+
+- Introduce a pure-Java motor scan state machine and data model without claiming a working Minecraft motor or a continuous 3D optics solver.
+- Position and angle commands are integer nano-SI representation quantities; their resolution does **not** specify actual hardware accuracy.
+- Enforce current, immutable device identity/revision, loaded state, server-side interlock, stopped motor and consecutive encoder stability prior to accepted power samples.
+- Rejected/invalid optical samples remain distinct from measured zero watts. A failed scan stays terminal pending a future trusted motor STOP acknowledgement.
+- No automatic laser ON, energy debit, Create integration, physical model approval or MC world mutation is authorized by this draft.
+
+## D22E (2026-10-28) — Read-only loaded-world geometry preview
+
+- The existing optical table provides an empty-hand local geometry inspector.
+- Server `LoadedApparatusSnapshot` is bounded to one actual world and one Tick;
+  no chunk is force-loaded, no motor is commanded, and no laser is enabled.
+- `BLOCK_ENTITY_INSTANCE` is only a same-session identity check;
+  `BLOCKSTATE_ONLY` cannot detect identical stateless replacement.
+- The nominal 1 m/block scale is an explicit DEV convention, not calibration.
+- `READ_ONLY_SERVER_SNAPSHOT` metadata and `REFERENCE_ONLY` predictions are
+  not `MEASURED` power samples or authorization for energy/device control.
+- JDK25 NeoForge build and in-game tests remain required release gates.
