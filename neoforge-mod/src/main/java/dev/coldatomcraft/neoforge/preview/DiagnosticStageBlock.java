@@ -8,6 +8,7 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockBehaviour;
@@ -16,6 +17,8 @@ import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.VoxelShape;
 
 /**
  * Manual, coarse grid DEV stage. Not a motor, no microposition, no FE or SU.
@@ -27,6 +30,12 @@ public final class DiagnosticStageBlock extends Block {
     public enum Kind { LINEAR, ROTARY }
     public static final EnumProperty<Direction> FACING = BlockStateProperties.HORIZONTAL_FACING;
     private final Kind kind;
+
+    // Visible D21 rail is only six model units high, not a full 16-unit cube.
+    // Directional envelopes follow the JSON model after FACING rotation.
+    private static final VoxelShape LINEAR_Z_SHAPE = box(1, 0, 0, 15, 6, 16);
+    private static final VoxelShape LINEAR_X_SHAPE = box(0, 0, 1, 16, 6, 15);
+    private static final VoxelShape ROTARY_SHAPE = box(1, 0, 1, 15, 7, 15);
 
     public DiagnosticStageBlock(Kind kind, BlockBehaviour.Properties properties) {
         super(properties);
@@ -40,6 +49,13 @@ public final class DiagnosticStageBlock extends Block {
 
     @Override protected void createBlockStateDefinition(StateDefinition.Builder<Block,BlockState> builder) {
         builder.add(FACING);
+    }
+
+    @Override protected VoxelShape getShape(BlockState state, BlockGetter level,
+                                              BlockPos pos, CollisionContext context) {
+        if (kind == Kind.ROTARY) return ROTARY_SHAPE;
+        return state.getValue(FACING).getAxis() == Direction.Axis.Z
+                ? LINEAR_Z_SHAPE : LINEAR_X_SHAPE;
     }
 
     @Override protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos,
